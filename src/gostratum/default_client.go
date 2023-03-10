@@ -48,19 +48,20 @@ func DefaultHandlers() StratumHandlerMap {
 }
 
 func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
-	if len(event.Params) < 1 {
+	if len(event.Params) < 2 {
 		return fmt.Errorf("malformed event from miner, expected param[1] to be address")
 	}
-	address, ok := event.Params[0].(string)
+	username, ok := event.Params[0].(string)
 	if !ok {
 		return fmt.Errorf("malformed event from miner, expected param[1] to be address string")
 	}
-	parts := strings.Split(address, ".")
-	var workerName string
-	if len(parts) >= 2 {
-		address = parts[0]
-		workerName = parts[1]
+
+	// TODO：设备名称，暂时使用miner钱包地址
+	address, ok := event.Params[1].(string)
+	if !ok {
+		return fmt.Errorf("malformed event from miner, expected param[1] to be address string")
 	}
+
 	var err error
 	address, err = CleanWallet(address)
 	if err != nil {
@@ -68,7 +69,7 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 	}
 
 	ctx.WalletAddr = address
-	ctx.WorkerName = workerName
+	ctx.WorkerName = username
 	ctx.Logger = ctx.Logger.With(zap.String("worker", ctx.WorkerName), zap.String("addr", ctx.WalletAddr))
 
 	if err := ctx.Reply(NewResponse(event, true, nil)); err != nil {
@@ -84,7 +85,7 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 
 func HandleSubscribe(ctx *StratumContext, event JsonRpcEvent) error {
 	if err := ctx.Reply(NewResponse(event,
-		[]any{true, "EthereumStratum/1.0.0"}, nil)); err != nil {
+		[]any{true, "kaspa/1.0.0"}, nil)); err != nil {
 		return errors.Wrap(err, "failed to send response to subscribe")
 	}
 	if len(event.Params) > 0 {
