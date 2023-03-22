@@ -17,8 +17,8 @@ type StratumContext struct {
 	parentContext context.Context
 	RemoteAddr    string
 	WalletAddr    string
-	WorkerName    string
-	RemoteApp     string
+	DeviceName    string
+	MinerName     string
 	Id            int32
 	Logger        *zap.Logger
 	connection    net.Conn
@@ -32,8 +32,8 @@ type StratumContext struct {
 type ContextSummary struct {
 	RemoteAddr string
 	WalletAddr string
-	WorkerName string
-	RemoteApp  string
+	DeviceName string
+	MinerName  string
 }
 
 var ErrorDisconnected = fmt.Errorf("disconnecting")
@@ -46,8 +46,8 @@ func (sc *StratumContext) Summary() ContextSummary {
 	return ContextSummary{
 		RemoteAddr: sc.RemoteAddr,
 		WalletAddr: sc.WalletAddr,
-		WorkerName: sc.WorkerName,
-		RemoteApp:  sc.RemoteApp,
+		DeviceName: sc.DeviceName,
+		MinerName:  sc.MinerName,
 	}
 }
 
@@ -58,8 +58,8 @@ func NewMockContext(ctx context.Context, logger *zap.Logger, state any) (*Stratu
 		State:         state,
 		RemoteAddr:    "127.0.0.1",
 		WalletAddr:    uuid.NewString(),
-		WorkerName:    uuid.NewString(),
-		RemoteApp:     "mock.context",
+		DeviceName:    uuid.NewString(),
+		MinerName:     "mock.context",
 		Logger:        logger,
 		connection:    mc,
 	}, mc

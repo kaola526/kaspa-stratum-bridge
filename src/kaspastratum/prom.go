@@ -79,8 +79,8 @@ var networkBlockCount = promauto.NewGauge(prometheus.GaugeOpts{
 
 func commonLabels(worker *gostratum.StratumContext) prometheus.Labels {
 	return prometheus.Labels{
-		"worker": worker.WorkerName,
-		"miner":  worker.RemoteApp,
+		"worker": worker.DeviceName,
+		"miner":  worker.MinerName,
 		"wallet": worker.WalletAddr,
 		"ip":     worker.RemoteAddr,
 	}
@@ -152,15 +152,15 @@ func InitInvalidCounter(worker *gostratum.StratumContext, errorType string) {
 }
 
 func InitWorkerCounters(worker *gostratum.StratumContext) {
-  labels := commonLabels(worker)
+	labels := commonLabels(worker)
 
 	shareCounter.With(labels).Add(0)
 	shareDiffCounter.With(labels).Add(0)
 
-  errTypes := []string{"stale", "duplicate", "invalid", "weak"}
-  for _, e := range errTypes {
-    InitInvalidCounter(worker, e)
-  }
+	errTypes := []string{"stale", "duplicate", "invalid", "weak"}
+	for _, e := range errTypes {
+		InitInvalidCounter(worker, e)
+	}
 
 	blockCounter.With(labels).Add(0)
 

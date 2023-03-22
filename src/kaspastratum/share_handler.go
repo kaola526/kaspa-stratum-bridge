@@ -26,7 +26,7 @@ type WorkStats struct {
 	SharesDiff    atomic.Float64
 	StaleShares   atomic.Int64
 	InvalidShares atomic.Int64
-	WorkerName    string
+	DeviceName    string
 	StartTime     time.Time
 	LastShare     time.Time
 }
@@ -51,23 +51,24 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 	sh.statsLock.Lock()
 	var stats *WorkStats
 	found := false
-	if ctx.WorkerName != "" {
-		stats, found = sh.stats[ctx.WorkerName]
+	if ctx.DeviceName != "" {
+		stats, found = sh.stats[ctx.DeviceName]
 	}
 	if !found { // no worker name, check by remote address
 		stats, found = sh.stats[ctx.RemoteAddr]
 		if found {
 			// no worker name, but remote addr is there
 			// so replacet the remote addr with the worker names
+			// TOOD，代码存在问题
 			delete(sh.stats, ctx.RemoteAddr)
-			stats.WorkerName = ctx.WorkerName
-			sh.stats[ctx.WorkerName] = stats
+			stats.DeviceName = ctx.DeviceName
+			sh.stats[ctx.DeviceName] = stats
 		}
 	}
 	if !found { // legit doesn't exist, create it
 		stats = &WorkStats{}
 		stats.LastShare = time.Now()
-		stats.WorkerName = ctx.RemoteAddr
+		stats.DeviceName = ctx.RemoteAddr
 		stats.StartTime = time.Now()
 		sh.stats[ctx.RemoteAddr] = stats
 
@@ -159,6 +160,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	}
 
 	//ctx.Logger.Debug(submitInfo.block.Header.BlueScore, " submit ", submitInfo.noncestr)
+	// TODO：bug
 	state := GetMiningState(ctx)
 	if state.useBigJob {
 		submitInfo.nonceVal, err = strconv.ParseUint(submitInfo.noncestr, 16, 64)
@@ -176,12 +178,12 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	stats := sh.getCreateStats(ctx)
 	// if err := sh.checkStales(ctx, submitInfo); err != nil {
 	// 	if err == ErrDupeShare {
-	// 		ctx.Logger.Info("dupe share "+submitInfo.noncestr, ctx.WorkerName, ctx.WalletAddr)
+	// 		ctx.Logger.Info("dupe share "+submitInfo.noncestr, ctx.DeviceName, ctx.WalletAddr)
 	// 		atomic.AddInt64(&stats.StaleShares, 1)
 	// 		RecordDupeShare(ctx)
 	// 		return ctx.ReplyDupeShare(event.Id)
 	// 	} else if errors.Is(err, ErrStaleShare) {
-	// 		ctx.Logger.Info(err.Error(), ctx.WorkerName, ctx.WalletAddr)
+	// 		ctx.Logger.Info(err.Error(), ctx.DeviceName, ctx.WalletAddr)
 	// 		atomic.AddInt64(&stats.StaleShares, 1)
 	// 		RecordStaleShare(ctx)
 	// 		return ctx.ReplyStaleShare(event.Id)
@@ -213,6 +215,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	// 	return ctx.ReplyLowDiffShare(event.Id)
 	// }
 
+	// TODO：
 	stats.SharesFound.Add(1)
 	stats.SharesDiff.Add(state.stratumDiff.hashValue)
 	stats.LastShare = time.Now()
@@ -285,7 +288,7 @@ func (sh *shareHandler) startStatsThread() error {
 			rateStr := fmt.Sprintf("%0.2fGH/s", rate) // todo, fix units
 			ratioStr := fmt.Sprintf("%d/%d/%d", v.SharesFound.Load(), v.StaleShares.Load(), v.InvalidShares.Load())
 			lines = append(lines, fmt.Sprintf(" %-15s| %14.14s | %14.14s | %12d | %11s",
-				v.WorkerName, rateStr, ratioStr, v.BlocksFound.Load(), time.Since(v.StartTime).Round(time.Second)))
+				v.DeviceName, rateStr, ratioStr, v.BlocksFound.Load(), time.Since(v.StartTime).Round(time.Second)))
 		}
 		sort.Strings(lines)
 		str += strings.Join(lines, "\n")

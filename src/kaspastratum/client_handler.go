@@ -46,10 +46,12 @@ func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler, mi
 
 func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
 	var extranonce int32
-
+	// TODO，断开重连会+1，会不会存在问题
+	// TODO，是否拒绝一些无效的连接
 	idx := atomic.AddInt32(&c.clientCounter, 1)
 	ctx.Id = idx
 	c.clientLock.Lock()
+	// nonce分配
 	if c.extranonceSize > 0 {
 		extranonce = c.nextExtranonce
 		if c.nextExtranonce < c.maxExtranonce {
@@ -124,7 +126,7 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 			jobId := state.AddJob(template.Block)
 			if !state.initialized {
 				state.initialized = true
-				state.useBigJob = bigJobRegex.MatchString(client.RemoteApp)
+				state.useBigJob = bigJobRegex.MatchString(client.MinerName)
 				// first pass through send the difficulty since it's fixed
 				state.stratumDiff = newKaspaDiff()
 				state.stratumDiff.setDiffValue(c.minShareDiff)
