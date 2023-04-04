@@ -1,6 +1,7 @@
 package kaspastratum
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"sort"
@@ -15,6 +16,7 @@ import (
 	"github.com/kaspanet/kaspad/domain/consensus/utils/pow"
 	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
 	"github.com/onemorebsmith/kaspastratum/src/gostratum"
+	"github.com/onemorebsmith/kaspastratum/src/mq"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
@@ -221,6 +223,29 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	stats.LastShare = time.Now()
 	sh.overall.SharesFound.Add(1)
 	RecordShareFound(ctx, state.stratumDiff.hashValue)
+
+	params, _ := json.Marshal()
+
+	mqDate := mq.MQShareRecordData{
+		AppName:          ctx.AppName,
+		AppVersion:       ctx.AppVersion,
+		RecodeType:       "submit",
+		MinerName:        ctx.MinerName,
+		DeviceCompany:    ctx.DeviceCompany,
+		DeviceType:       ctx.DeviceType,
+		DeviceName:       ctx.DeviceName,
+		RemoteAddr:       ctx.RemoteAddr,
+		Time:             time.Now().UnixNano() / int64(time.Millisecond),
+		Code:             0,
+		TargetDifficulty: state.stratumDiff.targetValue.Int64(),
+		Params:           string(params),
+	}
+
+	jsonData, err := json.MarshalIndent(mqDate, "", "  ")
+	if err == nil {
+		mq.Insertmqqt(ctx, string(jsonData), "Kaspa_Direct_Exchange", "Kaspa_Direct_Routing")
+	}
+
 
 	return ctx.Reply(gostratum.JsonRpcResponse{
 		Id:     event.Id,

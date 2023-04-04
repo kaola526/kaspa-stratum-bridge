@@ -9,24 +9,30 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/onemorebsmith/kaspastratum/src/mq"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
 type StratumContext struct {
-	parentContext context.Context
-	RemoteAddr    string
-	WalletAddr    string
-	DeviceName    string
-	MinerName     string
-	Id            int32
-	Logger        *zap.Logger
-	connection    net.Conn
-	disconnecting bool
-	onDisconnect  chan *StratumContext
-	State         any // gross, but go generics aren't mature enough this can be typed 😭
-	writeLock     int32
-	Extranonce    string
+	parentContext    context.Context
+	AppName          string
+	AppVersion       string
+	MinerName        string
+	DeviceCompany    string
+	DeviceType       string
+	DeviceName       string
+	RemoteAddr       string
+	WalletAddr       string
+	TargetDifficulty int64
+	Id               int32
+	Logger           *zap.Logger
+	connection       net.Conn
+	disconnecting    bool
+	onDisconnect     chan *StratumContext
+	State            any // gross, but go generics aren't mature enough this can be typed 😭
+	writeLock        int32
+	Extranonce       string
 }
 
 type ContextSummary struct {
@@ -162,6 +168,24 @@ func (sc *StratumContext) ReplyLowDiffShare(id any) error {
 
 func (sc *StratumContext) Disconnect() {
 	if !sc.disconnecting {
+		mqData := mq.MQShareRecordData{
+			AppName:          sc.AppName,
+			AppVersion:       sc.AppVersion,
+			RecodeType:       "Logout",
+			MinerName:        sc.MinerName,
+			DeviceCompany:    sc.DeviceCompany,
+			DeviceType:       sc.DeviceType,
+			DeviceName:       sc.DeviceName,
+			RemoteAddr:       sc.RemoteAddr,
+			Time:             time.Now().UnixNano() / int64(time.Millisecond),
+		}
+		
+		fmt.Println("mq ")
+		jsonData, err := json.MarshalIndent(mqData, "", "  ")
+		if err == nil {
+			mq.Insertmqqt(sc.parentContext, string(jsonData), "Kaspa_Direct_Exchange", "Kaspa_Direct_Routing")
+		}
+
 		sc.Logger.Info("disconnecting")
 		sc.disconnecting = true
 		if sc.connection != nil {
