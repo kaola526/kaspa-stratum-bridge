@@ -1,4 +1,4 @@
-package kaspastratum
+package poolstratum
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/onemorebsmith/kaspastratum/src/gostratum"
+	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )

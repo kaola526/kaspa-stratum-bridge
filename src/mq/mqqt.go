@@ -25,7 +25,7 @@ type MQShareRecordData struct {
 	RemoteAddr       string
 	Time             int64
 	Code             int
-	TargetDifficulty int64
+	TargetDifficulty uint64
 	Params           string
 }
 

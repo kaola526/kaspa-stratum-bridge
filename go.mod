@@ -1,4 +1,4 @@
-module github.com/onemorebsmith/kaspastratum
+module github.com/onemorebsmith/poolstratum
 
 go 1.18
 

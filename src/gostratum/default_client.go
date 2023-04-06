@@ -9,7 +9,7 @@ import (
 
 	"github.com/kaspanet/kaspad/util"
 	"github.com/mattn/go-colorable"
-	"github.com/onemorebsmith/kaspastratum/src/mq"
+	"github.com/onemorebsmith/poolstratum/src/mq"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -18,9 +18,9 @@ import (
 type StratumMethod string
 
 const (
-	StratumMethodSubscribe  StratumMethod = "mining.subscribe"
-	StratumMethodAuthorize  StratumMethod = "mining.authorize"
-	StratumMethodSubmit     StratumMethod = "mining.submit"
+	StratumMethodSubscribe StratumMethod = "mining.subscribe"
+	StratumMethodAuthorize StratumMethod = "mining.authorize"
+	StratumMethodSubmit    StratumMethod = "mining.submit"
 )
 
 func DefaultLogger() *zap.Logger {
@@ -44,9 +44,9 @@ func DefaultConfig(logger *zap.Logger) StratumListenerConfig {
 
 func DefaultHandlers() StratumHandlerMap {
 	return StratumHandlerMap{
-		string(StratumMethodSubscribe):  HandleSubscribe,
-		string(StratumMethodAuthorize):  HandleAuthorize,
-		string(StratumMethodSubmit):     HandleSubmit,
+		string(StratumMethodSubscribe): HandleSubscribe,
+		string(StratumMethodAuthorize): HandleAuthorize,
+		string(StratumMethodSubmit):    HandleSubmit,
 	}
 }
 
@@ -83,25 +83,25 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 	}
 
 	mqData := mq.MQShareRecordData{
-		AppName:          ctx.AppName,
-		AppVersion:       ctx.AppVersion,
-		RecodeType:       "Login",
-		MinerName:        ctx.MinerName,
-		DeviceCompany:    ctx.DeviceCompany,
-		DeviceType:       ctx.DeviceType,
-		DeviceName:       ctx.DeviceName,
-		RemoteAddr:       ctx.RemoteAddr,
-		Time:             time.Now().UnixNano() / int64(time.Millisecond),
+		AppName:       ctx.AppName,
+		AppVersion:    ctx.AppVersion,
+		RecodeType:    "Login",
+		MinerName:     ctx.MinerName,
+		DeviceCompany: ctx.DeviceCompany,
+		DeviceType:    ctx.DeviceType,
+		DeviceName:    ctx.DeviceName,
+		RemoteAddr:    ctx.RemoteAddr,
+		Time:          time.Now().UnixNano() / int64(time.Millisecond),
 	}
 
 	jsonData, err := json.MarshalIndent(mqData, "", "  ")
 	if err != nil {
 		return err
 	}
-	
+
 	ctx.Logger.Info(fmt.Sprintf("mq: %s", jsonData))
 	mq.Insertmqqt(ctx, string(jsonData), "Kaspa_Direct_Exchange", "Kaspa_Direct_Routing")
-	
+
 	ctx.Logger.Info(fmt.Sprintf("client authorized, address: %s", ctx.WalletAddr))
 	return nil
 }

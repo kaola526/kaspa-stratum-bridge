@@ -1,4 +1,4 @@
-package kaspastratum
+package poolstratum
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/kaspanet/kaspad/app/appmessage"
-	"github.com/onemorebsmith/kaspastratum/src/gostratum"
+	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

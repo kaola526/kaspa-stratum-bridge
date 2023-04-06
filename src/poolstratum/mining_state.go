@@ -1,4 +1,4 @@
-package kaspastratum
+package poolstratum
 
 import (
 	"math/big"
@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/kaspanet/kaspad/app/appmessage"
-	"github.com/onemorebsmith/kaspastratum/src/gostratum"
+	"github.com/onemorebsmith/poolstratum/src/gostratum"
 )
 
 const maxjobs = 32

@@ -8,6 +8,9 @@ stratum_port: :5555
 # kaspad_address: 46.17.104.200:16110
 kaspad_address: 192.168.11.75:16110
 
+# aleo_pool: 180.119.136.28:4040
+aleo_pool: 180.119.136.28:4040
+
 # min_share_diff: only accept shares of the specified difficulty (or higher) from 
 # the miner(s).  Higher values will reduce the number of shares submitted, thereby 
 # reducing network traffic and server load, while lower values will increase the

@@ -1,4 +1,4 @@
-package kaspastratum
+package poolstratum
 
 import (
 	"encoding/json"
@@ -15,8 +15,8 @@ import (
 	"github.com/kaspanet/kaspad/domain/consensus/utils/consensushashing"
 	"github.com/kaspanet/kaspad/domain/consensus/utils/pow"
 	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
-	"github.com/onemorebsmith/kaspastratum/src/gostratum"
-	"github.com/onemorebsmith/kaspastratum/src/mq"
+	"github.com/onemorebsmith/poolstratum/src/gostratum"
+	"github.com/onemorebsmith/poolstratum/src/mq"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
@@ -86,8 +86,8 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 type submitInfo struct {
 	block    *appmessage.RPCBlock
 	state    *MiningState
-	noncestr string
-	nonceVal uint64
+	Noncestr string
+	NonceVal uint64
 }
 
 func validateSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) (*submitInfo, error) {
@@ -119,7 +119,7 @@ func validateSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent)
 	return &submitInfo{
 		state:    state,
 		block:    block,
-		noncestr: strings.Replace(noncestr, "0x", "", 1),
+		Noncestr: strings.Replace(noncestr, "0x", "", 1),
 	}, nil
 }
 
@@ -156,8 +156,8 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	// expected (16 - <extranonce length> characters)
 	if ctx.Extranonce != "" {
 		extranonce2Len := 16 - len(ctx.Extranonce)
-		if len(submitInfo.noncestr) <= extranonce2Len {
-			submitInfo.noncestr = ctx.Extranonce + fmt.Sprintf("%0*s", extranonce2Len, submitInfo.noncestr)
+		if len(submitInfo.Noncestr) <= extranonce2Len {
+			submitInfo.Noncestr = ctx.Extranonce + fmt.Sprintf("%0*s", extranonce2Len, submitInfo.Noncestr)
 		}
 	}
 
@@ -165,13 +165,13 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	// TODO：bug
 	state := GetMiningState(ctx)
 	if state.useBigJob {
-		submitInfo.nonceVal, err = strconv.ParseUint(submitInfo.noncestr, 16, 64)
+		submitInfo.NonceVal, err = strconv.ParseUint(submitInfo.Noncestr, 16, 64)
 		if err != nil {
 			RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
 			return errors.Wrap(err, "failed parsing noncestr")
 		}
 	} else {
-		submitInfo.nonceVal, err = strconv.ParseUint(submitInfo.noncestr, 16, 64)
+		submitInfo.NonceVal, err = strconv.ParseUint(submitInfo.Noncestr, 16, 64)
 		if err != nil {
 			RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
 			return errors.Wrap(err, "failed parsing noncestr")
@@ -200,13 +200,13 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		return fmt.Errorf("failed to cast block to mutable block: %+v", err)
 	}
 	mutableHeader := converted.Header.ToMutable()
-	mutableHeader.SetNonce(submitInfo.nonceVal)
+	mutableHeader.SetNonce(submitInfo.NonceVal)
 	powState := pow.NewState(mutableHeader)
 	powValue := powState.CalculateProofOfWorkValue()
 
 	// The block hash must be less or equal than the claimed target.
 	if powValue.Cmp(&powState.Target) <= 0 {
-		if err := sh.submit(ctx, converted, submitInfo.nonceVal, event.Id); err != nil {
+		if err := sh.submit(ctx, converted, submitInfo.NonceVal, event.Id); err != nil {
 			return err
 		}
 	}
@@ -224,7 +224,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	sh.overall.SharesFound.Add(1)
 	RecordShareFound(ctx, state.stratumDiff.hashValue)
 
-	params, _ := json.Marshal()
+	params, _ := json.Marshal(submitInfo)
 
 	mqDate := mq.MQShareRecordData{
 		AppName:          ctx.AppName,
@@ -237,7 +237,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		RemoteAddr:       ctx.RemoteAddr,
 		Time:             time.Now().UnixNano() / int64(time.Millisecond),
 		Code:             0,
-		TargetDifficulty: state.stratumDiff.targetValue.Int64(),
+		TargetDifficulty: uint64(state.stratumDiff.diffValue),
 		Params:           string(params),
 	}
 
@@ -245,7 +245,6 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	if err == nil {
 		mq.Insertmqqt(ctx, string(jsonData), "Kaspa_Direct_Exchange", "Kaspa_Direct_Routing")
 	}
-
 
 	return ctx.Reply(gostratum.JsonRpcResponse{
 		Id:     event.Id,

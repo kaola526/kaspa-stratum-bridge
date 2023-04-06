@@ -1,4 +1,4 @@
-package kaspastratum
+package poolstratum
 
 import (
 	"encoding/json"

@@ -8,7 +8,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/onemorebsmith/kaspastratum/src/kaspastratum"
+	"github.com/onemorebsmith/poolstratum/src/poolstratum"
 	"gopkg.in/yaml.v2"
 )
 
@@ -21,7 +21,7 @@ func main() {
 		log.Printf("config file not found: %s", err)
 		os.Exit(1)
 	}
-	cfg := kaspastratum.BridgeConfig{}
+	cfg := poolstratum.BridgeConfig{}
 	if err := yaml.Unmarshal(rawCfg, &cfg); err != nil {
 		log.Printf("failed parsing config file: %s", err)
 		os.Exit(1)
@@ -58,7 +58,7 @@ func main() {
 	log.Printf("\thealth check:    %s", cfg.HealthCheckPort)
 	log.Println("----------------------------------")
 
-	if err := kaspastratum.ListenAndServe(cfg); err != nil {
+	if err := poolstratum.ListenAndServe(cfg); err != nil {
 		log.Println(err)
 	}
 }

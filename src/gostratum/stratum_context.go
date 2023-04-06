@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/onemorebsmith/kaspastratum/src/mq"
+	"github.com/onemorebsmith/poolstratum/src/mq"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -169,17 +169,17 @@ func (sc *StratumContext) ReplyLowDiffShare(id any) error {
 func (sc *StratumContext) Disconnect() {
 	if !sc.disconnecting {
 		mqData := mq.MQShareRecordData{
-			AppName:          sc.AppName,
-			AppVersion:       sc.AppVersion,
-			RecodeType:       "Logout",
-			MinerName:        sc.MinerName,
-			DeviceCompany:    sc.DeviceCompany,
-			DeviceType:       sc.DeviceType,
-			DeviceName:       sc.DeviceName,
-			RemoteAddr:       sc.RemoteAddr,
-			Time:             time.Now().UnixNano() / int64(time.Millisecond),
+			AppName:       sc.AppName,
+			AppVersion:    sc.AppVersion,
+			RecodeType:    "Logout",
+			MinerName:     sc.MinerName,
+			DeviceCompany: sc.DeviceCompany,
+			DeviceType:    sc.DeviceType,
+			DeviceName:    sc.DeviceName,
+			RemoteAddr:    sc.RemoteAddr,
+			Time:          time.Now().UnixNano() / int64(time.Millisecond),
 		}
-		
+
 		fmt.Println("mq ")
 		jsonData, err := json.MarshalIndent(mqData, "", "  ")
 		if err == nil {
