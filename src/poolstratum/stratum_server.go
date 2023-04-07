@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mattn/go-colorable"
+	"github.com/onemorebsmith/poolstratum/src/chainnode/aleo"
 	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -19,6 +20,7 @@ const minBlockWaitTime = 500 * time.Millisecond
 type BridgeConfig struct {
 	StratumPort     string        `yaml:"stratum_port"`
 	RPCServer       string        `yaml:"kaspad_address"`
+	AleoPool        string        `yaml:"aleo_pool"`
 	PromPort        string        `yaml:"prom_port"`
 	PrintStats      bool          `yaml:"print_stats"`
 	UseLogFile      bool          `yaml:"log_to_file"`
@@ -68,6 +70,8 @@ func ListenAndServe(cfg BridgeConfig) error {
 		return err
 	}
 
+	aleoApi, err := aleo.NewAleoNode(cfg.AleoPool, blockWaitTime, logger)
+
 	if cfg.HealthCheckPort != "" {
 		logger.Info("enabling health check on port " + cfg.HealthCheckPort)
 		http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +112,10 @@ func ListenAndServe(cfg BridgeConfig) error {
 	defer cancel()
 	ksApi.Start(ctx, func() {
 		clientHandler.NewBlockAvailable(ksApi)
+	})
+
+	aleoApi.Start(ctx,  func() {
+		// clientHandler.NewBlockAvailable(ksApi)
 	})
 
 	if cfg.PrintStats {
