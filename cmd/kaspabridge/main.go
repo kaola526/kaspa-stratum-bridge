@@ -48,8 +48,8 @@ func main() {
 
 	log.Println("----------------------------------")
 	log.Printf("initializing bridge")
-	log.Printf("\tchaintype:        %s", cfg.ChainType)
-	log.Printf("\tchainrpc:         %s", cfg.ChainRPC)
+	log.Printf("\tchaintype:       %s", cfg.ChainType)
+	log.Printf("\tchainrpc:        %s", cfg.ChainRPC)
 	log.Printf("\tstratum:         %s", cfg.StratumPort)
 	log.Printf("\tprom:            %s", cfg.PromPort)
 	log.Printf("\tstats:           %t", cfg.PrintStats)

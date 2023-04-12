@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kaspanet/kaspad/app/appmessage"
+	"github.com/kaspanet/kaspad/domain/consensus/model/externalapi"
 	"github.com/pkg/errors"
 )
 
@@ -72,8 +74,8 @@ func NewResponse(event JsonRpcEvent, results any, err []any) JsonRpcResponse {
 	}
 }
 
-func CreateStratumClient(address string, channelid string, minername string, devicename string) StratumClient {
-	return StratumClient{
+func CreateStratumClient(address string, channelid string, minername string, devicename string) *StratumClient {
+	return &StratumClient{
 		Config: PoolConfig{address, channelid, minername, devicename},
 	}
 }
@@ -262,4 +264,34 @@ func (sc *StratumClient) Disconnect() {
 	if sc.connected {
 		// TODO 处理断开逻辑
 	}
+}
+
+func (sc *StratumClient) Close() error {
+	return fmt.Errorf("aleo not Close")
+}
+
+func (sc *StratumClient) Reconnect() error {
+	return fmt.Errorf("aleo not Reconnect")
+}
+
+func (sc *StratumClient) GetBlockDAGInfo() (*appmessage.GetBlockDAGInfoResponseMessage, error) {
+	return nil, fmt.Errorf("aleo not GetBlockDAGInfo")
+}
+func (sc *StratumClient) EstimateNetworkHashesPerSecond(startHash string, windowSize uint32) (*appmessage.EstimateNetworkHashesPerSecondResponseMessage, error) {
+	return nil, fmt.Errorf("aleo not EstimateNetworkHashesPerSecond")
+}
+func (sc *StratumClient) GetInfo() (*appmessage.GetInfoResponseMessage, error) {
+	return nil, fmt.Errorf("aleo not GetInfo")
+}
+func (sc *StratumClient) RegisterForNewBlockTemplateNotifications(onNewBlockTemplate func(notification *appmessage.NewBlockTemplateNotificationMessage)) error {
+	return fmt.Errorf("aleo not RegisterForNewBlockTemplateNotifications")
+}
+func (sc *StratumClient) GetBlockTemplate(miningAddress, extraData string) (*appmessage.GetBlockTemplateResponseMessage, error) {
+	return nil, fmt.Errorf("aleo not GetBlockTemplate")
+}
+func (sc *StratumClient) GetBalancesByAddresses(addresses []string) (*appmessage.GetBalancesByAddressesResponseMessage, error) {
+	return nil, fmt.Errorf("aleo not GetBalancesByAddresses")
+}
+func (sc *StratumClient) SubmitBlock(block *externalapi.DomainBlock) (appmessage.RejectReason, error) {
+	return appmessage.RejectReasonNone, fmt.Errorf("aleo not SubmitBlock")
 }

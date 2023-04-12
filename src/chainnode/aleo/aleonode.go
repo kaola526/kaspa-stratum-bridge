@@ -25,7 +25,7 @@ type AleoNode struct {
 	/// 连接状态
 	connected bool
 	///
-	aleoclient aleostratum.StratumClient
+	aleoclient *aleostratum.StratumClient
 }
 
 func NewAleoNode(address string, blockWaitTime time.Duration, logger *zap.SugaredLogger) (*AleoNode, error) {

@@ -4,15 +4,17 @@ stratum_port: :5555
 
 # chain_type
 # kaspa: kaspa
-# aleo: aleo
 chain_type: kaspa
+# aleo: aleo
+# chain_type: aleo
 
 # chain_rpc: address/port of the rpc server for kaspad, typically 16110
 # For a list of public nodes, run `nslookup mainnet-dnsseed.daglabs-dev.com` 
 # uncomment for to use a public node
 # kaspad: 192.168.11.75:16110
-# aleo: 192.168.11.51:4040
 chain_rpc: 192.168.11.75:16110
+# aleo: 192.168.11.51:4040
+# chain_rpc: 192.168.11.51:4040
 
 
 # min_share_diff: only accept shares of the specified difficulty (or higher) from 
@@ -20,9 +22,10 @@ chain_rpc: 192.168.11.75:16110
 # reducing network traffic and server load, while lower values will increase the
 # number of shares submitted, thereby reducing the amount of time needed for 
 # accurate hashrate measurements
-# aleo  -- p, 64k(65536)
 # kaspa -- gh, 4
 min_share_diff: 4
+# aleo  -- p, 64k(65536)
+# min_share_diff: 65536
 
 # block_wait_time: time to wait since last new block message from kaspad before
 # manually requesting a new block

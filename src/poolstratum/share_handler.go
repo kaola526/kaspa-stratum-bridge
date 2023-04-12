@@ -15,7 +15,6 @@ import (
 	"github.com/kaspanet/kaspad/domain/consensus/model/externalapi"
 	"github.com/kaspanet/kaspad/domain/consensus/utils/consensushashing"
 	"github.com/kaspanet/kaspad/domain/consensus/utils/pow"
-	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
 	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	"github.com/onemorebsmith/poolstratum/src/mq"
 	"github.com/pkg/errors"
@@ -36,16 +35,16 @@ type WorkStats struct {
 }
 
 type shareHandler struct {
-	kaspa        *rpcclient.RPCClient
+	poolapi        ChainApiInterface
 	stats        map[string]*WorkStats
 	statsLock    sync.Mutex
 	overall      WorkStats
 	tipBlueScore uint64
 }
 
-func newShareHandler(kaspa *rpcclient.RPCClient) *shareHandler {
+func newShareHandler(poolapi ChainApiInterface) *shareHandler {
 	return &shareHandler{
-		kaspa:     kaspa,
+		poolapi:     poolapi,
 		stats:     map[string]*WorkStats{},
 		statsLock: sync.Mutex{},
 	}
@@ -263,7 +262,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 		Header:       mutable.ToImmutable(),
 		Transactions: block.Transactions,
 	}
-	_, err := sh.kaspa.SubmitBlock(block)
+	_, err := sh.poolapi.SubmitBlock(block)
 	blockhash := consensushashing.BlockHash(block)
 	// print after the submit to get it submitted faster
 	ctx.Logger.Info(fmt.Sprintf("Submitted block %s", blockhash))

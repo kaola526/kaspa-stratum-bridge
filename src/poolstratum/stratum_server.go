@@ -15,18 +15,13 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const (
-	ChainTypeAleo  = "aleo"
-	ChainTypeKaspa = "kaspa"
-)
-
 const version = "v1.1.6"
 const minBlockWaitTime = 500 * time.Millisecond
 
 type BridgeConfig struct {
 	StratumPort     string        `yaml:"stratum_port"`
-	ChainType        string        `yaml:"chain_type"`
-	ChainRPC         string        `yaml:"chain_rpc"`
+	ChainType       string        `yaml:"chain_type"`
+	ChainRPC        string        `yaml:"chain_rpc"`
 	PromPort        string        `yaml:"prom_port"`
 	PrintStats      bool          `yaml:"print_stats"`
 	UseLogFile      bool          `yaml:"log_to_file"`
@@ -63,6 +58,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 	logger, logCleanup := configureZap(cfg)
 	defer logCleanup()
 
+	// TODO
 	if cfg.PromPort != "" {
 		StartPromServer(logger, cfg.PromPort)
 	}
@@ -72,6 +68,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 		blockWaitTime = minBlockWaitTime
 	}
 
+	// TODO
 	if cfg.HealthCheckPort != "" {
 		logger.Info("enabling health check on port " + cfg.HealthCheckPort)
 		http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +76,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 		})
 		go http.ListenAndServe(cfg.HealthCheckPort, nil)
 	}
+
 	minDiff := cfg.MinShareDiff
 	if minDiff < 1 {
 		minDiff = 1
@@ -93,17 +91,17 @@ func ListenAndServe(cfg BridgeConfig) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var ksApi *KaspaApi
+	var poolApi *PoolApi
 	var aleoApi *aleo.AleoNode
 	var err error
+	poolApi, err = NewPoolAPI(cfg.ChainType, cfg.ChainRPC, blockWaitTime, logger)
+	if err != nil {
+		return err
+	}
 
 	if cfg.ChainType == ChainTypeKaspa {
-		ksApi, err = NewKaspaAPI(cfg.ChainRPC, blockWaitTime, logger)
-		if err != nil {
-			return err
-		}
 
-		shareHandler := newShareHandler(ksApi.kaspad)
+		shareHandler := newShareHandler(poolApi.chainapi)
 
 		clientHandler := newClientListener(logger, shareHandler, float64(minDiff), int8(extranonceSize))
 
@@ -124,8 +122,8 @@ func ListenAndServe(cfg BridgeConfig) error {
 			Logger:         logger.Desugar(),
 		}
 
-		ksApi.Start(ctx, func() {
-			clientHandler.NewBlockAvailable(ksApi)
+		poolApi.Start(ctx, func() {
+			clientHandler.NewBlockAvailable(poolApi)
 		})
 
 		if cfg.PrintStats {
@@ -142,6 +140,9 @@ func ListenAndServe(cfg BridgeConfig) error {
 		aleoApi.Start(ctx, func() {
 			// clientHandler.NewBlockAvailable(ksApi)
 		})
+
+		// TODO
+		<-ctx.Done()
 		return nil
 	} else {
 		return fmt.Errorf("config.yaml set pool_type (%s) is error ", cfg.ChainType)

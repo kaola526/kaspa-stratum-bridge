@@ -85,7 +85,7 @@ func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 	RecordDisconnect(ctx)
 }
 
-func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
+func (c *clientListener) NewBlockAvailable(kapi *PoolApi) {
 	c.clientLock.Lock()
 	addresses := make([]string, 0, len(c.clients))
 	for _, cl := range c.clients {
@@ -177,7 +177,7 @@ func (c *clientListener) NewBlockAvailable(kapi *KaspaApi) {
 		c.lastBalanceCheck = time.Now()
 		if len(addresses) > 0 {
 			go func() {
-				balances, err := kapi.kaspad.GetBalancesByAddresses(addresses)
+				balances, err := kapi.chainapi.GetBalancesByAddresses(addresses)
 				if err != nil {
 					c.logger.Warn("failed to get balances from kaspa, prom stats will be out of date", zap.Error(err))
 					return
