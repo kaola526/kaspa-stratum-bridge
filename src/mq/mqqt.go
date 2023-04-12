@@ -11,10 +11,11 @@ import (
 )
 
 type MQKaspaData struct {
-	AppName          string
+	AppName string
 }
 
 type MQShareRecordData struct {
+	MessageId        string
 	AppName          string
 	AppVersion       string
 	RecodeType       string

@@ -169,6 +169,7 @@ func (sc *StratumContext) ReplyLowDiffShare(id any) error {
 func (sc *StratumContext) Disconnect() {
 	if !sc.disconnecting {
 		mqData := mq.MQShareRecordData{
+			MessageId:     uuid.New().String(),
 			AppName:       sc.AppName,
 			AppVersion:    sc.AppVersion,
 			RecodeType:    "Logout",

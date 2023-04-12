@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kaspanet/kaspad/util"
 	"github.com/mattn/go-colorable"
 	"github.com/onemorebsmith/poolstratum/src/mq"
@@ -83,6 +84,7 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 	}
 
 	mqData := mq.MQShareRecordData{
+		MessageId:     uuid.New().String(),
 		AppName:       ctx.AppName,
 		AppVersion:    ctx.AppVersion,
 		RecodeType:    "Login",

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kaspanet/kaspad/app/appmessage"
 	"github.com/kaspanet/kaspad/domain/consensus/model/externalapi"
 	"github.com/kaspanet/kaspad/domain/consensus/utils/consensushashing"
@@ -28,6 +29,7 @@ type WorkStats struct {
 	SharesDiff    atomic.Float64
 	StaleShares   atomic.Int64
 	InvalidShares atomic.Int64
+	AppNameOrVer  string
 	DeviceName    string
 	StartTime     time.Time
 	LastShare     time.Time
@@ -78,7 +80,7 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 		// resetting on disconnect
 		InitWorkerCounters(ctx)
 	}
-
+	stats.AppNameOrVer = ctx.AppName + "/" + ctx.AppVersion
 	sh.statsLock.Unlock()
 	return stats
 }
@@ -227,6 +229,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	params, _ := json.Marshal(submitInfo)
 
 	mqDate := mq.MQShareRecordData{
+		MessageId:		  uuid.New().String(),
 		AppName:          ctx.AppName,
 		AppVersion:       ctx.AppVersion,
 		RecodeType:       "submit",
@@ -301,9 +304,9 @@ func (sh *shareHandler) startStatsThread() error {
 		// console formatting is terrible. Good luck whever touches anything
 		time.Sleep(10 * time.Second)
 		sh.statsLock.Lock()
-		str := "\n===============================================================================\n"
-		str += "  worker name   |  avg hashrate  |   acc/stl/inv  |    blocks    |    uptime   \n"
-		str += "-------------------------------------------------------------------------------\n"
+		str := "\n=================================================================================================\n"
+		str += "     app name    |  worker name   |  avg hashrate  |   acc/stl/inv  |    blocks    |    uptime   \n"
+		str += "-------------------------------------------------------------------------------------------------\n"
 		var lines []string
 		totalRate := float64(0)
 		for _, v := range sh.stats {
@@ -311,17 +314,17 @@ func (sh *shareHandler) startStatsThread() error {
 			totalRate += rate
 			rateStr := fmt.Sprintf("%0.2fGH/s", rate) // todo, fix units
 			ratioStr := fmt.Sprintf("%d/%d/%d", v.SharesFound.Load(), v.StaleShares.Load(), v.InvalidShares.Load())
-			lines = append(lines, fmt.Sprintf(" %-15s| %14.14s | %14.14s | %12d | %11s",
-				v.DeviceName, rateStr, ratioStr, v.BlocksFound.Load(), time.Since(v.StartTime).Round(time.Second)))
+			lines = append(lines, fmt.Sprintf(" %-16s| %-15s| %14.14s | %14.14s | %12d | %11s",
+				v.AppNameOrVer, v.DeviceName, rateStr, ratioStr, v.BlocksFound.Load(), time.Since(v.StartTime).Round(time.Second)))
 		}
 		sort.Strings(lines)
 		str += strings.Join(lines, "\n")
 		rateStr := fmt.Sprintf("%0.2fGH/s", totalRate) // todo, fix units
 		ratioStr := fmt.Sprintf("%d/%d/%d", sh.overall.SharesFound.Load(), sh.overall.StaleShares.Load(), sh.overall.InvalidShares.Load())
-		str += "\n-------------------------------------------------------------------------------\n"
-		str += fmt.Sprintf("                | %14.14s | %14.14s | %12d | %11s",
+		str += "\n-------------------------------------------------------------------------------------------------\n"
+		str += fmt.Sprintf("                 |                | %14.14s | %14.14s | %12d | %11s",
 			rateStr, ratioStr, sh.overall.BlocksFound.Load(), time.Since(start).Round(time.Second))
-		str += "\n========================================================== ks_bridge_" + version + " ===\n"
+		str += "\n========================================================================== pool_bridge_" + version + " ===\n"
 		sh.statsLock.Unlock()
 		log.Println(str)
 	}
