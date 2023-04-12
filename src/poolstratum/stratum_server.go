@@ -2,6 +2,7 @@ package poolstratum
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -14,13 +15,18 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+const (
+	ChainTypeAleo  = "aleo"
+	ChainTypeKaspa = "kaspa"
+)
+
 const version = "v1.1.6"
 const minBlockWaitTime = 500 * time.Millisecond
 
 type BridgeConfig struct {
 	StratumPort     string        `yaml:"stratum_port"`
-	RPCServer       string        `yaml:"kaspad_address"`
-	AleoPool        string        `yaml:"aleo_pool"`
+	ChainType        string        `yaml:"chain_type"`
+	ChainRPC         string        `yaml:"chain_rpc"`
 	PromPort        string        `yaml:"prom_port"`
 	PrintStats      bool          `yaml:"print_stats"`
 	UseLogFile      bool          `yaml:"log_to_file"`
@@ -65,12 +71,6 @@ func ListenAndServe(cfg BridgeConfig) error {
 	if blockWaitTime < minBlockWaitTime {
 		blockWaitTime = minBlockWaitTime
 	}
-	ksApi, err := NewKaspaAPI(cfg.RPCServer, blockWaitTime, logger)
-	if err != nil {
-		return err
-	}
-
-	aleoApi, err := aleo.NewAleoNode(cfg.AleoPool, blockWaitTime, logger)
 
 	if cfg.HealthCheckPort != "" {
 		logger.Info("enabling health check on port " + cfg.HealthCheckPort)
@@ -79,8 +79,6 @@ func ListenAndServe(cfg BridgeConfig) error {
 		})
 		go http.ListenAndServe(cfg.HealthCheckPort, nil)
 	}
-
-	shareHandler := newShareHandler(ksApi.kaspad)
 	minDiff := cfg.MinShareDiff
 	if minDiff < 1 {
 		minDiff = 1
@@ -89,38 +87,63 @@ func ListenAndServe(cfg BridgeConfig) error {
 	if extranonceSize > 3 {
 		extranonceSize = 3
 	}
-	clientHandler := newClientListener(logger, shareHandler, float64(minDiff), int8(extranonceSize))
-	handlers := gostratum.DefaultHandlers()
-	// override the submit handler with an actual useful handler
-	handlers[string(gostratum.StratumMethodSubmit)] =
-		func(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
-			if err := shareHandler.HandleSubmit(ctx, event); err != nil {
-				ctx.Logger.Sugar().Error(err) // sink error
-			}
-			return nil
-		}
 
-	stratumConfig := gostratum.StratumListenerConfig{
-		Port:           cfg.StratumPort,
-		HandlerMap:     handlers,
-		StateGenerator: MiningStateGenerator,
-		ClientListener: clientHandler,
-		Logger:         logger.Desugar(),
-	}
+	handlers := gostratum.DefaultHandlers()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ksApi.Start(ctx, func() {
-		clientHandler.NewBlockAvailable(ksApi)
-	})
 
-	aleoApi.Start(ctx,  func() {
-		// clientHandler.NewBlockAvailable(ksApi)
-	})
+	var ksApi *KaspaApi
+	var aleoApi *aleo.AleoNode
+	var err error
 
-	if cfg.PrintStats {
-		go shareHandler.startStatsThread()
+	if cfg.ChainType == ChainTypeKaspa {
+		ksApi, err = NewKaspaAPI(cfg.ChainRPC, blockWaitTime, logger)
+		if err != nil {
+			return err
+		}
+
+		shareHandler := newShareHandler(ksApi.kaspad)
+
+		clientHandler := newClientListener(logger, shareHandler, float64(minDiff), int8(extranonceSize))
+
+		// override the submit handler with an actual useful handler
+		handlers[string(gostratum.StratumMethodSubmit)] =
+			func(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
+				if err := shareHandler.HandleSubmit(ctx, event); err != nil {
+					ctx.Logger.Sugar().Error(err) // sink error
+				}
+				return nil
+			}
+
+		stratumConfig := gostratum.StratumListenerConfig{
+			Port:           cfg.StratumPort,
+			HandlerMap:     handlers,
+			StateGenerator: MiningStateGenerator,
+			ClientListener: clientHandler,
+			Logger:         logger.Desugar(),
+		}
+
+		ksApi.Start(ctx, func() {
+			clientHandler.NewBlockAvailable(ksApi)
+		})
+
+		if cfg.PrintStats {
+			go shareHandler.startStatsThread()
+		}
+
+		return gostratum.NewListener(stratumConfig).Listen(context.Background())
+	} else if cfg.ChainType == ChainTypeAleo {
+		aleoApi, err = aleo.NewAleoNode(cfg.ChainRPC, blockWaitTime, logger)
+		if err != nil {
+			return err
+		}
+
+		aleoApi.Start(ctx, func() {
+			// clientHandler.NewBlockAvailable(ksApi)
+		})
+		return nil
+	} else {
+		return fmt.Errorf("config.yaml set pool_type (%s) is error ", cfg.ChainType)
 	}
-
-	return gostratum.NewListener(stratumConfig).Listen(context.Background())
 }

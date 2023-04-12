@@ -181,7 +181,6 @@ func (sc *StratumContext) Disconnect() {
 			Time:          time.Now().UnixNano() / int64(time.Millisecond),
 		}
 
-		fmt.Println("mq ")
 		jsonData, err := json.MarshalIndent(mqData, "", "  ")
 		if err == nil {
 			mq.Insertmqqt(sc.parentContext, string(jsonData), "Kaspa_Direct_Exchange", "Kaspa_Direct_Routing")

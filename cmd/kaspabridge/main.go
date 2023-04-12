@@ -28,8 +28,9 @@ func main() {
 	}
 
 	flag.StringVar(&cfg.StratumPort, "stratum", cfg.StratumPort, "stratum port to listen on, default `:5555`")
+	flag.StringVar(&cfg.ChainType, "chaintype", cfg.ChainType, "pool use type default `:kaspa`")
 	flag.BoolVar(&cfg.PrintStats, "stats", cfg.PrintStats, "true to show periodic stats to console, default `true`")
-	flag.StringVar(&cfg.RPCServer, "kaspa", cfg.RPCServer, "address of the kaspad node, default `localhost:16110`")
+	flag.StringVar(&cfg.ChainRPC, "chainrpc", cfg.ChainRPC, "address of the chain node, default `localhost:16110`")
 	flag.DurationVar(&cfg.BlockWaitTime, "blockwait", cfg.BlockWaitTime, "time in ms to wait before manually requesting new block, default `500`")
 	flag.UintVar(&cfg.MinShareDiff, "mindiff", cfg.MinShareDiff, "minimum share difficulty to accept from miner(s), default `4`")
 	flag.UintVar(&cfg.ExtranonceSize, "extranonce", cfg.ExtranonceSize, "size in bytes of extranonce, default `0`")
@@ -47,7 +48,8 @@ func main() {
 
 	log.Println("----------------------------------")
 	log.Printf("initializing bridge")
-	log.Printf("\tkaspad:          %s", cfg.RPCServer)
+	log.Printf("\tchaintype:        %s", cfg.ChainType)
+	log.Printf("\tchainrpc:         %s", cfg.ChainRPC)
 	log.Printf("\tstratum:         %s", cfg.StratumPort)
 	log.Printf("\tprom:            %s", cfg.PromPort)
 	log.Printf("\tstats:           %t", cfg.PrintStats)
