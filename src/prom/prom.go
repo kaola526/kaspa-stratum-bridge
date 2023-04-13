@@ -1,4 +1,4 @@
-package poolstratum
+package prom
 
 import (
 	"fmt"

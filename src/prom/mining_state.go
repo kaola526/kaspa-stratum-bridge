@@ -1,4 +1,4 @@
-package poolstratum
+package prom
 
 import (
 	"math/big"
@@ -14,19 +14,19 @@ const maxjobs = 32
 type MiningState struct {
 	Jobs        map[int]*appmessage.RPCBlock
 	JobLock     sync.Mutex
-	jobCounter  int
-	bigDiff     big.Int
-	initialized bool
-	useBigJob   bool
-	connectTime time.Time
-	stratumDiff *kaspaDiff
+	JobCounter  int
+	BigDiff     big.Int
+	Initialized bool
+	UseBigJob   bool
+	ConnectTime time.Time
+	StratumDiff *KaspaDiff
 }
 
 func MiningStateGenerator() any {
 	return &MiningState{
 		Jobs:        map[int]*appmessage.RPCBlock{},
 		JobLock:     sync.Mutex{},
-		connectTime: time.Now(),
+		ConnectTime: time.Now(),
 	}
 }
 
@@ -35,8 +35,8 @@ func GetMiningState(ctx *gostratum.StratumContext) *MiningState {
 }
 
 func (ms *MiningState) AddJob(job *appmessage.RPCBlock) int {
-	ms.jobCounter++
-	idx := ms.jobCounter
+	ms.JobCounter++
+	idx := ms.JobCounter
 	ms.JobLock.Lock()
 	ms.Jobs[idx%maxjobs] = job
 	ms.JobLock.Unlock()

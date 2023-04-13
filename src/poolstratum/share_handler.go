@@ -15,8 +15,10 @@ import (
 	"github.com/kaspanet/kaspad/domain/consensus/model/externalapi"
 	"github.com/kaspanet/kaspad/domain/consensus/utils/consensushashing"
 	"github.com/kaspanet/kaspad/domain/consensus/utils/pow"
+	"github.com/onemorebsmith/poolstratum/src/chainnode"
 	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	"github.com/onemorebsmith/poolstratum/src/mq"
+	"github.com/onemorebsmith/poolstratum/src/prom"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
@@ -35,16 +37,16 @@ type WorkStats struct {
 }
 
 type shareHandler struct {
-	poolapi        ChainApiInterface
+	poolapi      *chainnode.ChainNode
 	stats        map[string]*WorkStats
 	statsLock    sync.Mutex
 	overall      WorkStats
 	tipBlueScore uint64
 }
 
-func newShareHandler(poolapi ChainApiInterface) *shareHandler {
+func newShareHandler(poolapi *chainnode.ChainNode) *shareHandler {
 	return &shareHandler{
-		poolapi:     poolapi,
+		poolapi:   poolapi,
 		stats:     map[string]*WorkStats{},
 		statsLock: sync.Mutex{},
 	}
@@ -77,7 +79,7 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 
 		// TODO: not sure this is the best place, nor whether we shouldn't be
 		// resetting on disconnect
-		InitWorkerCounters(ctx)
+		prom.InitWorkerCounters(ctx)
 	}
 	stats.AppNameOrVer = ctx.AppName + "/" + ctx.AppVersion
 	sh.statsLock.Unlock()
@@ -86,35 +88,35 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 
 type submitInfo struct {
 	block    *appmessage.RPCBlock
-	state    *MiningState
+	state    *prom.MiningState
 	Noncestr string
 	NonceVal uint64
 }
 
 func validateSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) (*submitInfo, error) {
 	if len(event.Params) < 3 {
-		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
+		prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
 		return nil, fmt.Errorf("malformed event, expected at least 2 params")
 	}
 	jobIdStr, ok := event.Params[1].(string)
 	if !ok {
-		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
+		prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
 		return nil, fmt.Errorf("unexpected type for param 1: %+v", event.Params...)
 	}
 	jobId, err := strconv.ParseInt(jobIdStr, 10, 0)
 	if err != nil {
-		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
+		prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
 		return nil, errors.Wrap(err, "job id is not parsable as an number")
 	}
-	state := GetMiningState(ctx)
+	state := prom.GetMiningState(ctx)
 	block, exists := state.GetJob(int(jobId))
 	if !exists {
-		RecordWorkerError(ctx.WalletAddr, ErrMissingJob)
+		prom.RecordWorkerError(ctx.WalletAddr, prom.ErrMissingJob)
 		return nil, fmt.Errorf("job does not exist. stale?")
 	}
 	noncestr, ok := event.Params[2].(string)
 	if !ok {
-		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
+		prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
 		return nil, fmt.Errorf("unexpected type for param 2: %+v", event.Params...)
 	}
 	return &submitInfo{
@@ -140,7 +142,7 @@ func (sh *shareHandler) checkStales(ctx *gostratum.StratumContext, si *submitInf
 		return nil // can't be
 	}
 	if tip-si.block.Header.BlueScore > workWindow {
-		RecordStaleShare(ctx)
+		prom.RecordStaleShare(ctx)
 		return errors.Wrapf(ErrStaleShare, "blueScore %d vs %d", si.block.Header.BlueScore, tip)
 	}
 	// TODO (bs): dupe share tracking
@@ -164,17 +166,17 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 
 	//ctx.Logger.Debug(submitInfo.block.Header.BlueScore, " submit ", submitInfo.noncestr)
 	// TODO：bug
-	state := GetMiningState(ctx)
-	if state.useBigJob {
+	state := prom.GetMiningState(ctx)
+	if state.UseBigJob {
 		submitInfo.NonceVal, err = strconv.ParseUint(submitInfo.Noncestr, 16, 64)
 		if err != nil {
-			RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
+			prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
 			return errors.Wrap(err, "failed parsing noncestr")
 		}
 	} else {
 		submitInfo.NonceVal, err = strconv.ParseUint(submitInfo.Noncestr, 16, 64)
 		if err != nil {
-			RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
+			prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
 			return errors.Wrap(err, "failed parsing noncestr")
 		}
 	}
@@ -220,15 +222,15 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 
 	// TODO：
 	stats.SharesFound.Add(1)
-	stats.SharesDiff.Add(state.stratumDiff.hashValue)
+	stats.SharesDiff.Add(state.StratumDiff.HashValue)
 	stats.LastShare = time.Now()
 	sh.overall.SharesFound.Add(1)
-	RecordShareFound(ctx, state.stratumDiff.hashValue)
+	prom.RecordShareFound(ctx, state.StratumDiff.HashValue)
 
 	params, _ := json.Marshal(submitInfo)
 
 	mqDate := mq.MQShareRecordData{
-		MessageId:		  uuid.New().String(),
+		MessageId:        uuid.New().String(),
 		AppName:          ctx.AppName,
 		AppVersion:       ctx.AppVersion,
 		RecodeType:       "submit",
@@ -239,7 +241,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		RemoteAddr:       ctx.RemoteAddr,
 		Time:             time.Now().UnixNano() / int64(time.Millisecond),
 		Code:             0,
-		TargetDifficulty: uint64(state.stratumDiff.diffValue),
+		TargetDifficulty: uint64(state.StratumDiff.DiffValue),
 		Params:           string(params),
 	}
 
@@ -274,13 +276,13 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 			// stale
 			sh.getCreateStats(ctx).StaleShares.Add(1)
 			sh.overall.StaleShares.Add(1)
-			RecordStaleShare(ctx)
+			prom.RecordStaleShare(ctx)
 			return ctx.ReplyStaleShare(eventId)
 		} else {
 			ctx.Logger.Warn("block rejected, unknown issue (probably bad pow", zap.Error(err))
 			sh.getCreateStats(ctx).InvalidShares.Add(1)
 			sh.overall.InvalidShares.Add(1)
-			RecordInvalidShare(ctx)
+			prom.RecordInvalidShare(ctx)
 			return ctx.ReplyBadShare(eventId)
 		}
 	}
@@ -290,7 +292,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 	stats := sh.getCreateStats(ctx)
 	stats.BlocksFound.Add(1)
 	sh.overall.BlocksFound.Add(1)
-	RecordBlockFound(ctx, block.Header.Nonce(), block.Header.BlueScore(), blockhash.String())
+	prom.RecordBlockFound(ctx, block.Header.Nonce(), block.Header.BlueScore(), blockhash.String())
 
 	// nil return allows HandleSubmit to record share (blocks are shares too!) and
 	// handle the response to the client

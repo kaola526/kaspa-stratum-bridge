@@ -6,59 +6,26 @@ import (
 	"time"
 
 	"github.com/kaspanet/kaspad/app/appmessage"
-	"github.com/kaspanet/kaspad/domain/consensus/model/externalapi"
-	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
-	"github.com/onemorebsmith/poolstratum/src/chainnode/aleo/aleostratum"
+	"github.com/onemorebsmith/poolstratum/src/chainnode"
 	"github.com/onemorebsmith/poolstratum/src/gostratum"
+	"github.com/onemorebsmith/poolstratum/src/prom"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
-
-const (
-	ChainTypeAleo  = "aleo"
-	ChainTypeKaspa = "kaspa"
-)
-
-const (
-	ChannelId  = "aleopool"
-	MinerName  = "rdpool"
-	DeviceName = "rddevice"
-)
-
-// 定义一个接口
-type ChainApiInterface interface {
-	Reconnect() error
-	Close() error
-	GetBlockDAGInfo() (*appmessage.GetBlockDAGInfoResponseMessage, error)
-	EstimateNetworkHashesPerSecond(startHash string, windowSize uint32) (*appmessage.EstimateNetworkHashesPerSecondResponseMessage, error)
-	GetInfo() (*appmessage.GetInfoResponseMessage, error)
-	RegisterForNewBlockTemplateNotifications(onNewBlockTemplate func(notification *appmessage.NewBlockTemplateNotificationMessage)) error
-	GetBlockTemplate(miningAddress, extraData string) (*appmessage.GetBlockTemplateResponseMessage, error)
-	GetBalancesByAddresses(addresses []string) (*appmessage.GetBalancesByAddressesResponseMessage, error)
-	SubmitBlock(block *externalapi.DomainBlock) (appmessage.RejectReason, error)
-}
 
 type PoolApi struct {
 	chainType     string
 	address       string
 	blockWaitTime time.Duration
 	logger        *zap.SugaredLogger
-	chainapi      ChainApiInterface
+	ChainNode     *chainnode.ChainNode
 	connected     bool
 }
 
 func NewPoolAPI(chain_type string, address string, blockWaitTime time.Duration, logger *zap.SugaredLogger) (*PoolApi, error) {
-	var chainapi ChainApiInterface
-	var err error
-	if chain_type == ChainTypeKaspa {
-		chainapi, err = rpcclient.NewRPCClient(address)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if chain_type == ChainTypeAleo {
-		chainapi = aleostratum.CreateStratumClient(address, ChannelId, MinerName, DeviceName)
+	chainnode, err := chainnode.CreateChainNode(chain_type, address)
+	if err != nil {
+		return nil, err
 	}
 
 	return &PoolApi{
@@ -66,39 +33,38 @@ func NewPoolAPI(chain_type string, address string, blockWaitTime time.Duration, 
 		address:       address,
 		blockWaitTime: blockWaitTime,
 		logger:        logger.With(zap.String("component", chain_type+":"+address)),
-		chainapi:      chainapi,
+		ChainNode:     chainnode,
 		connected:     true,
 	}, nil
 }
 
 func (api *PoolApi) Start(ctx context.Context, blockCb func()) {
-	fmt.Print(api.chainType, " Start\n")
-	if api.chainType == ChainTypeKaspa {
+	api.logger.Info(api.chainType, " Start\n")
+	if api.chainType == chainnode.ChainTypeKaspa {
 		api.waitForSync(true)
 		go api.startBlockTemplateListener(ctx, blockCb)
 		go api.startStatsThread(ctx)
-	} else if api.chainType == ChainTypeAleo {
+	} else if api.chainType == chainnode.ChainTypeAleo {
 		go func(ctx context.Context, blockCb func()) {
-			// TODO
-			// for {
-			// 	fmt.Print("AleoNode Subscribe\n")
-			// 	err := api.aleop.Subscribe()
-			// 	if err != nil {
-			// 		api.logger.Error("subscribe err ", err)
-			// 		time.Sleep(time.Second * 5)
-			// 		continue
-			// 	}
-			// 	fmt.Print("AleoNode Authorize\n")
-			// 	err = api.aleop.Authorize()
-			// 	if err != nil {
-			// 		api.logger.Error("authorize err ", err)
-			// 		time.Sleep(time.Second * 5)
-			// 		continue
-			// 	}
+			for {
+				fmt.Print("AleoNode Subscribe\n")
+				err := api.ChainNode.Subscribe()
+				if err != nil {
+					api.logger.Error("subscribe err ", err)
+					time.Sleep(time.Second * 5)
+					continue
+				}
+				fmt.Print("AleoNode Authorize\n")
+				err = api.ChainNode.Authorize()
+				if err != nil {
+					api.logger.Error("authorize err ", err)
+					time.Sleep(time.Second * 5)
+					continue
+				}
 
-			// 	api.startBlockTemplateListener(ctx, blockCb)
-			// 	time.Sleep(time.Second * 5)
-			// }
+				api.startBlockTemplateListener(ctx, blockCb)
+				time.Sleep(time.Second * 5)
+			}
 		}(ctx, blockCb)
 	}
 }
@@ -111,31 +77,31 @@ func (api *PoolApi) startStatsThread(ctx context.Context) {
 			api.logger.Warn("context cancelled, stopping stats thread")
 			return
 		case <-ticker.C:
-			dagResponse, err := api.chainapi.GetBlockDAGInfo()
+			dagResponse, err := api.ChainNode.GetBlockDAGInfo()
 			if err != nil {
 				api.logger.Warn("failed to get network hashrate from kaspa, prom stats will be out of date", zap.Error(err))
 				continue
 			}
-			response, err := api.chainapi.EstimateNetworkHashesPerSecond(dagResponse.TipHashes[0], 1000)
+			response, err := api.ChainNode.EstimateNetworkHashesPerSecond(dagResponse.TipHashes[0], 1000)
 			if err != nil {
 				api.logger.Warn("failed to get network hashrate from kaspa, prom stats will be out of date", zap.Error(err))
 				continue
 			}
-			RecordNetworkStats(response.NetworkHashesPerSecond, dagResponse.BlockCount, dagResponse.Difficulty)
+			prom.RecordNetworkStats(response.NetworkHashesPerSecond, dagResponse.BlockCount, dagResponse.Difficulty)
 		}
 	}
 }
 
 func (api *PoolApi) reconnect() error {
-	if api.chainapi != nil {
-		return api.chainapi.Reconnect()
+	if api.ChainNode != nil {
+		return api.ChainNode.Reconnect()
 	}
 
-	client, err := rpcclient.NewRPCClient(api.address)
+	client, err := chainnode.CreateChainNode(api.chainType, api.address)
 	if err != nil {
 		return err
 	}
-	api.chainapi = client
+	api.ChainNode = client
 	return nil
 }
 
@@ -144,7 +110,7 @@ func (api *PoolApi) waitForSync(verbose bool) error {
 		api.logger.Info("checking kaspad sync state")
 	}
 	for {
-		clientInfo, err := api.chainapi.GetInfo()
+		clientInfo, err := api.ChainNode.GetInfo()
 		if err != nil {
 			return errors.Wrapf(err, "error fetching server info from kaspad @ %s", api.address)
 		}
@@ -161,9 +127,9 @@ func (api *PoolApi) waitForSync(verbose bool) error {
 }
 
 func (api *PoolApi) startBlockTemplateListener(ctx context.Context, blockReadyCb func()) {
-	if api.chainType == ChainTypeKaspa {
+	if api.chainType == chainnode.ChainTypeKaspa {
 		blockReadyChan := make(chan bool)
-		err := api.chainapi.RegisterForNewBlockTemplateNotifications(func(_ *appmessage.NewBlockTemplateNotificationMessage) {
+		err := api.ChainNode.RegisterForNewBlockTemplateNotifications(func(_ *appmessage.NewBlockTemplateNotificationMessage) {
 			blockReadyChan <- true
 		})
 		if err != nil {
@@ -190,18 +156,19 @@ func (api *PoolApi) startBlockTemplateListener(ctx context.Context, blockReadyCb
 				blockReadyCb()
 			}
 		}
-	} else if api.chainType == ChainTypeAleo {
-		// TODO
-		// api.aleop.Listen(func(line string) error {
-		// 	fmt.Println("aleoclient Listen", line)
-		// 	return nil
-		// })
+	} else if api.chainType == chainnode.ChainTypeAleo {
+		api.ChainNode.Listen(func(line string) error {
+			fmt.Println("aleoclient Listen", line)
+			
+			blockReadyCb()
+			return nil
+		})
 	}
 }
 
 func (api *PoolApi) GetBlockTemplate(
 	client *gostratum.StratumContext) (*appmessage.GetBlockTemplateResponseMessage, error) {
-	template, err := api.chainapi.GetBlockTemplate(client.WalletAddr,
+	template, err := api.ChainNode.GetBlockTemplate(client.WalletAddr,
 		fmt.Sprintf(`'%s' via onemorebsmith/kaspa-stratum-bridge_%s`, client.MinerName, version))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed fetching new block template from kaspa")

@@ -2,15 +2,14 @@ package poolstratum
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"time"
 
 	"github.com/mattn/go-colorable"
-	"github.com/onemorebsmith/poolstratum/src/chainnode/aleo"
 	"github.com/onemorebsmith/poolstratum/src/gostratum"
+	"github.com/onemorebsmith/poolstratum/src/prom"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -60,7 +59,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 
 	// TODO
 	if cfg.PromPort != "" {
-		StartPromServer(logger, cfg.PromPort)
+		prom.StartPromServer(logger, cfg.PromPort)
 	}
 
 	blockWaitTime := cfg.BlockWaitTime
@@ -91,60 +90,38 @@ func ListenAndServe(cfg BridgeConfig) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var poolApi *PoolApi
-	var aleoApi *aleo.AleoNode
-	var err error
-	poolApi, err = NewPoolAPI(cfg.ChainType, cfg.ChainRPC, blockWaitTime, logger)
+	poolApi, err := NewPoolAPI(cfg.ChainType, cfg.ChainRPC, blockWaitTime, logger)
 	if err != nil {
 		return err
 	}
 
-	if cfg.ChainType == ChainTypeKaspa {
+	shareHandler := newShareHandler(poolApi.ChainNode)
+	clientHandler := newClientListener(logger, shareHandler, float64(minDiff), int8(extranonceSize))
 
-		shareHandler := newShareHandler(poolApi.chainapi)
-
-		clientHandler := newClientListener(logger, shareHandler, float64(minDiff), int8(extranonceSize))
-
-		// override the submit handler with an actual useful handler
-		handlers[string(gostratum.StratumMethodSubmit)] =
-			func(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
-				if err := shareHandler.HandleSubmit(ctx, event); err != nil {
-					ctx.Logger.Sugar().Error(err) // sink error
-				}
-				return nil
+	// override the submit handler with an actual useful handler
+	handlers[string(gostratum.StratumMethodSubmit)] =
+		func(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
+			if err := shareHandler.HandleSubmit(ctx, event); err != nil {
+				ctx.Logger.Sugar().Error(err) // sink error
 			}
-
-		stratumConfig := gostratum.StratumListenerConfig{
-			Port:           cfg.StratumPort,
-			HandlerMap:     handlers,
-			StateGenerator: MiningStateGenerator,
-			ClientListener: clientHandler,
-			Logger:         logger.Desugar(),
+			return nil
 		}
 
-		poolApi.Start(ctx, func() {
-			clientHandler.NewBlockAvailable(poolApi)
-		})
-
-		if cfg.PrintStats {
-			go shareHandler.startStatsThread()
-		}
-
-		return gostratum.NewListener(stratumConfig).Listen(context.Background())
-	} else if cfg.ChainType == ChainTypeAleo {
-		aleoApi, err = aleo.NewAleoNode(cfg.ChainRPC, blockWaitTime, logger)
-		if err != nil {
-			return err
-		}
-
-		aleoApi.Start(ctx, func() {
-			// clientHandler.NewBlockAvailable(ksApi)
-		})
-
-		// TODO
-		<-ctx.Done()
-		return nil
-	} else {
-		return fmt.Errorf("config.yaml set pool_type (%s) is error ", cfg.ChainType)
+	stratumConfig := gostratum.StratumListenerConfig{
+		Port:           cfg.StratumPort,
+		HandlerMap:     handlers,
+		StateGenerator: prom.MiningStateGenerator,
+		ClientListener: clientHandler,
+		Logger:         logger.Desugar(),
 	}
+
+	poolApi.Start(ctx, func() {
+		clientHandler.NewBlockAvailable(poolApi)
+	})
+
+	if cfg.PrintStats {
+		go shareHandler.startStatsThread()
+	}
+
+	return gostratum.NewListener(stratumConfig).Listen(context.Background())
 }

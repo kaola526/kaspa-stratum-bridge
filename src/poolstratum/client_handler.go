@@ -3,18 +3,15 @@ package poolstratum
 import (
 	"fmt"
 	"math"
-	"regexp"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/onemorebsmith/poolstratum/src/gostratum"
+	"github.com/onemorebsmith/poolstratum/src/prom"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
-
-var bigJobRegex = regexp.MustCompile(".*BzMiner.*")
 
 const balanceDelay = time.Minute
 
@@ -82,71 +79,24 @@ func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 	delete(c.clients, ctx.Id)
 	c.logger.Info("removed client ", ctx.Id)
 	c.clientLock.Unlock()
-	RecordDisconnect(ctx)
+	prom.RecordDisconnect(ctx)
 }
 
-func (c *clientListener) NewBlockAvailable(kapi *PoolApi) {
+func (c *clientListener) NewBlockAvailable(poolApi *PoolApi) {
 	c.clientLock.Lock()
 	addresses := make([]string, 0, len(c.clients))
 	for _, cl := range c.clients {
+		if cl.AppName != poolApi.chainType {
+			c.logger.Info("client type ", cl.AppName, " != chain type "+poolApi.chainType)
+			continue
+		}
 		if !cl.Connected() {
 			continue
 		}
 		go func(client *gostratum.StratumContext) {
-			state := GetMiningState(client)
-			if client.WalletAddr == "" {
-				if time.Since(state.connectTime) > time.Second*20 { // timeout passed
-					// this happens pretty frequently in gcp/aws land since script-kiddies scrape ports
-					client.Logger.Warn("client misconfigured, no miner address specified - disconnecting", zap.String("client", client.String()))
-					RecordWorkerError(client.WalletAddr, ErrNoMinerAddress)
-					client.Disconnect() // invalid configuration, boot the worker
-				}
-				return
-			}
-			template, err := kapi.GetBlockTemplate(client)
+			jobId, jobParams, err := poolApi.ChainNode.GetNotifyParams(c.minShareDiff, client)
 			if err != nil {
-				if strings.Contains(err.Error(), "Could not decode address") {
-					RecordWorkerError(client.WalletAddr, ErrInvalidAddressFmt)
-					client.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa, malformed address: %s", err))
-					client.Disconnect() // unrecoverable
-				} else {
-					RecordWorkerError(client.WalletAddr, ErrFailedBlockFetch)
-					client.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
-				}
 				return
-			}
-			state.bigDiff = CalculateTarget(uint64(template.Block.Header.Bits))
-			header, err := SerializeBlockHeader(template.Block)
-			if err != nil {
-				RecordWorkerError(client.WalletAddr, ErrBadDataFromMiner)
-				client.Logger.Error(fmt.Sprintf("failed to serialize block header: %s", err))
-				return
-			}
-
-			jobId := state.AddJob(template.Block)
-			if !state.initialized {
-				state.initialized = true
-				state.useBigJob = bigJobRegex.MatchString(client.MinerName)
-				// first pass through send the difficulty since it's fixed
-				state.stratumDiff = newKaspaDiff()
-				state.stratumDiff.setDiffValue(c.minShareDiff)
-				if err := client.Send(gostratum.JsonRpcEvent{
-					Version: "2.0",
-					Method:  "mining.set_difficulty",
-					Params:  []any{state.stratumDiff.diffValue},
-				}); err != nil {
-					RecordWorkerError(client.WalletAddr, ErrFailedSetDiff)
-					client.Logger.Error(errors.Wrap(err, "failed sending difficulty").Error(), zap.Any("context", client))
-					return
-				}
-			}
-
-			jobParams := []any{fmt.Sprintf("%d", jobId)}
-			if state.useBigJob {
-				jobParams = append(jobParams, GenerateLargeJobParams(header, uint64(template.Block.Header.Timestamp)))
-			} else {
-				jobParams = append(jobParams, GenerateJobHeader(header))
-				jobParams = append(jobParams, template.Block.Header.Timestamp)
 			}
 
 			// // normal notify flow
@@ -157,14 +107,14 @@ func (c *clientListener) NewBlockAvailable(kapi *PoolApi) {
 				Params:  jobParams,
 			}); err != nil {
 				if errors.Is(err, gostratum.ErrorDisconnected) {
-					RecordWorkerError(client.WalletAddr, ErrDisconnected)
+					prom.RecordWorkerError(client.WalletAddr, prom.ErrDisconnected)
 					return
 				}
-				RecordWorkerError(client.WalletAddr, ErrFailedSendWork)
+				prom.RecordWorkerError(client.WalletAddr, prom.ErrFailedSendWork)
 				client.Logger.Error(errors.Wrapf(err, "failed sending work packet %d", jobId).Error())
 			}
 
-			RecordNewJob(client)
+			prom.RecordNewJob(client)
 		}(cl)
 
 		if cl.WalletAddr != "" {
@@ -177,12 +127,12 @@ func (c *clientListener) NewBlockAvailable(kapi *PoolApi) {
 		c.lastBalanceCheck = time.Now()
 		if len(addresses) > 0 {
 			go func() {
-				balances, err := kapi.chainapi.GetBalancesByAddresses(addresses)
+				balances, err := poolApi.ChainNode.GetBalancesByAddresses(addresses)
 				if err != nil {
 					c.logger.Warn("failed to get balances from kaspa, prom stats will be out of date", zap.Error(err))
 					return
 				}
-				RecordBalances(balances)
+				prom.RecordBalances(balances)
 			}()
 		}
 	}
