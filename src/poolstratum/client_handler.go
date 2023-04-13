@@ -26,9 +26,10 @@ type clientListener struct {
 	extranonceSize   int8
 	maxExtranonce    int32
 	nextExtranonce   int32
+	poolApi          *PoolApi
 }
 
-func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler, minShareDiff float64, extranonceSize int8) *clientListener {
+func newClientListener(poolApi *PoolApi, logger *zap.SugaredLogger, shareHandler *shareHandler, minShareDiff float64, extranonceSize int8) *clientListener {
 	return &clientListener{
 		logger:         logger,
 		minShareDiff:   minShareDiff,
@@ -38,6 +39,7 @@ func newClientListener(logger *zap.SugaredLogger, shareHandler *shareHandler, mi
 		clientLock:     sync.RWMutex{},
 		shareHandler:   shareHandler,
 		clients:        make(map[int32]*gostratum.StratumContext),
+		poolApi:        poolApi,
 	}
 }
 
@@ -82,7 +84,11 @@ func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 	prom.RecordDisconnect(ctx)
 }
 
-func (c *clientListener) NewBlockAvailable(poolApi *PoolApi) {
+func (c *clientListener) NewBlockAvailable() {
+	if c.poolApi == nil {
+		return
+	}
+	poolApi := c.poolApi
 	c.clientLock.Lock()
 	addresses := make([]string, 0, len(c.clients))
 	for _, cl := range c.clients {

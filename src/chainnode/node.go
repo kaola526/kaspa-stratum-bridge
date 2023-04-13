@@ -164,6 +164,15 @@ func (chainnode *ChainNode) Listen(cb func(line string) error) error {
 	return fmt.Errorf(chainnode.chainType, " not Listen")
 }
 
+// 保存chain发送的work数据
+func (chainnode *ChainNode) SaveWork(work *gostratum.JsonRpcEvent) error {
+	if chainnode.checkType(ChainTypeAleo) {
+		chainnode.aleoaip.LastWork = work
+		return nil
+	}
+	return fmt.Errorf(chainnode.chainType, " not Listen")
+}
+
 func (chainnode *ChainNode) GetNotifyParams(diff float64, client *gostratum.StratumContext) (int, []any, error) {
 	var jobId int
 	var jobParams []any
@@ -226,8 +235,14 @@ func (chainnode *ChainNode) GetNotifyParams(diff float64, client *gostratum.Stra
 
 		return jobId, jobParams, nil
 	} else if chainnode.checkType(ChainTypeAleo) {
-
-		jobParams = []any{fmt.Sprintf("%d", jobId)}
+		if chainnode.aleoaip.LastWork == nil {
+			return 0, nil, fmt.Errorf(chainnode.chainType, " LastWork is nil")
+		}
+		if len(chainnode.aleoaip.LastWork.Params) != 6 {
+			return 0, nil, fmt.Errorf(chainnode.chainType, " LastWork LastWork.Params len != 6")
+		}
+		jobId = 0
+		jobParams = chainnode.aleoaip.LastWork.Params
 
 		return jobId, jobParams, nil
 	}

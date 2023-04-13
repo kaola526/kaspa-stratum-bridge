@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	"github.com/pkg/errors"
 )
 
@@ -62,6 +63,7 @@ type StratumClient struct {
 	conn      net.Conn
 	connected bool
 	writeLock int32
+	LastWork  *gostratum.JsonRpcEvent
 }
 
 func NewResponse(event JsonRpcEvent, results any, err []any) JsonRpcResponse {

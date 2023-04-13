@@ -18,6 +18,7 @@ type EventHandler func(ctx *StratumContext, event JsonRpcEvent) error
 type StratumClientListener interface {
 	OnConnect(ctx *StratumContext)
 	OnDisconnect(ctx *StratumContext)
+	NewBlockAvailable()
 }
 
 type StratumHandlerMap map[string]EventHandler
@@ -113,9 +114,14 @@ func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 
 func (s *StratumListener) HandleEvent(ctx *StratumContext, event JsonRpcEvent) error {
 	if handler, exists := s.HandlerMap[string(event.Method)]; exists {
-		return handler(ctx, event)
+		err := handler(ctx, event)
+		if err == nil {
+			s.ClientListener.NewBlockAvailable()
+		}
+		return err
 	}
 	//s.Logger.Warn(fmt.Sprintf("unhandled event '%+v'", event))
+	
 	return nil
 }
 

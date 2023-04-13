@@ -104,6 +104,7 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 	mq.Insertmqqt(ctx, string(jsonData), "Kaspa_Direct_Exchange", "Kaspa_Direct_Routing")
 
 	ctx.Logger.Info(fmt.Sprintf("client authorized, address: %s", ctx.WalletAddr))
+	
 	return nil
 }
 
