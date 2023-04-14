@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/mattn/go-colorable"
+	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	"github.com/onemorebsmith/poolstratum/src/prom"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-const version = "v1.1.6"
+const version = "v0.0.1"
 const minBlockWaitTime = 500 * time.Millisecond
 
 type BridgeConfig struct {
@@ -99,8 +100,8 @@ func ListenAndServe(cfg BridgeConfig) error {
 	clientHandler := newClientListener(poolApi, logger, shareHandler, float64(minDiff), int8(extranonceSize))
 
 	// override the submit handler with an actual useful handler
-	handlers[string(gostratum.StratumMethodSubmit)] =
-		func(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
+	handlers[string(M.StratumMethodSubmit)] =
+		func(ctx *gostratum.StratumContext, event M.JsonRpcEvent) error {
 			if err := shareHandler.HandleSubmit(ctx, event); err != nil {
 				ctx.Logger.Sugar().Error(err) // sink error
 			}

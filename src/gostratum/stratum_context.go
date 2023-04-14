@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	"github.com/onemorebsmith/poolstratum/src/mq"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -76,7 +77,7 @@ func (sc *StratumContext) String() string {
 	return string(serialized)
 }
 
-func (sc *StratumContext) Reply(response JsonRpcResponse) error {
+func (sc *StratumContext) Reply(response M.JsonRpcResponse) error {
 	if sc.disconnecting {
 		return ErrorDisconnected
 	}
@@ -88,7 +89,7 @@ func (sc *StratumContext) Reply(response JsonRpcResponse) error {
 	return sc.writeWithBackoff(encoded)
 }
 
-func (sc *StratumContext) Send(event JsonRpcEvent) error {
+func (sc *StratumContext) Send(event M.JsonRpcEvent) error {
 	if sc.disconnecting {
 		return ErrorDisconnected
 	}
@@ -136,14 +137,14 @@ func (sc *StratumContext) writeWithBackoff(data []byte) error {
 }
 
 func (sc *StratumContext) ReplyStaleShare(id any) error {
-	return sc.Reply(JsonRpcResponse{
+	return sc.Reply(M.JsonRpcResponse{
 		Id:     id,
 		Result: nil,
 		Error:  []any{21, "Job not found", nil},
 	})
 }
 func (sc *StratumContext) ReplyDupeShare(id any) error {
-	return sc.Reply(JsonRpcResponse{
+	return sc.Reply(M.JsonRpcResponse{
 		Id:     id,
 		Result: nil,
 		Error:  []any{22, "Duplicate share submitted", nil},
@@ -151,7 +152,7 @@ func (sc *StratumContext) ReplyDupeShare(id any) error {
 }
 
 func (sc *StratumContext) ReplyBadShare(id any) error {
-	return sc.Reply(JsonRpcResponse{
+	return sc.Reply(M.JsonRpcResponse{
 		Id:     id,
 		Result: nil,
 		Error:  []any{20, "Unknown problem", nil},
@@ -159,7 +160,7 @@ func (sc *StratumContext) ReplyBadShare(id any) error {
 }
 
 func (sc *StratumContext) ReplyLowDiffShare(id any) error {
-	return sc.Reply(JsonRpcResponse{
+	return sc.Reply(M.JsonRpcResponse{
 		Id:     id,
 		Result: nil,
 		Error:  []any{23, "Invalid difficulty", nil},

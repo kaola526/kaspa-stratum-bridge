@@ -11,18 +11,12 @@ import (
 	"github.com/kaspanet/kaspad/util"
 	"github.com/mattn/go-colorable"
 	"github.com/onemorebsmith/poolstratum/src/mq"
+	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-type StratumMethod string
-
-const (
-	StratumMethodSubscribe StratumMethod = "mining.subscribe"
-	StratumMethodAuthorize StratumMethod = "mining.authorize"
-	StratumMethodSubmit    StratumMethod = "mining.submit"
-)
 
 func DefaultLogger() *zap.Logger {
 	cfg := zap.NewDevelopmentEncoderConfig()
@@ -45,13 +39,13 @@ func DefaultConfig(logger *zap.Logger) StratumListenerConfig {
 
 func DefaultHandlers() StratumHandlerMap {
 	return StratumHandlerMap{
-		string(StratumMethodSubscribe): HandleSubscribe,
-		string(StratumMethodAuthorize): HandleAuthorize,
-		string(StratumMethodSubmit):    HandleSubmit,
+		string(M.StratumMethodSubscribe): HandleSubscribe,
+		string(M.StratumMethodAuthorize): HandleAuthorize,
+		string(M.StratumMethodSubmit):    HandleSubmit,
 	}
 }
 
-func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
+func HandleAuthorize(ctx *StratumContext, event M.JsonRpcEvent) error {
 	if len(event.Params) < 2 {
 		return fmt.Errorf("malformed event from miner, expected param[1] to be address")
 	}
@@ -76,7 +70,7 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 	ctx.DeviceName = devicename
 	ctx.Logger = ctx.Logger.With(zap.String("worker", ctx.DeviceName), zap.String("addr", ctx.WalletAddr))
 
-	if err := ctx.Reply(NewResponse(event, true, nil)); err != nil {
+	if err := ctx.Reply(M.NewResponse(event, true, nil)); err != nil {
 		return errors.Wrap(err, "failed to send response to authorize")
 	}
 	if ctx.Extranonce != "" {
@@ -108,8 +102,8 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 	return nil
 }
 
-func HandleSubscribe(ctx *StratumContext, event JsonRpcEvent) error {
-	if err := ctx.Reply(NewResponse(event,
+func HandleSubscribe(ctx *StratumContext, event M.JsonRpcEvent) error {
+	if err := ctx.Reply(M.NewResponse(event,
 		[]any{true, "kaspa/1.0.0"}, nil)); err != nil {
 		return errors.Wrap(err, "failed to send response to subscribe")
 	}
@@ -141,14 +135,14 @@ func HandleSubscribe(ctx *StratumContext, event JsonRpcEvent) error {
 	return nil
 }
 
-func HandleSubmit(ctx *StratumContext, event JsonRpcEvent) error {
+func HandleSubmit(ctx *StratumContext, event M.JsonRpcEvent) error {
 	// stub
 	ctx.Logger.Info("work submission")
 	return nil
 }
 
 func SendExtranonce(ctx *StratumContext) {
-	if err := ctx.Send(NewEvent("", "set_extranonce", []any{ctx.Extranonce, len(ctx.Extranonce)})); err != nil {
+	if err := ctx.Send(M.NewEvent("", "set_extranonce", []any{ctx.Extranonce, len(ctx.Extranonce)})); err != nil {
 		// should we doing anything further on failure
 		ctx.Logger.Error(errors.Wrap(err, "failed to set extranonce").Error(), zap.Any("context", ctx))
 	}

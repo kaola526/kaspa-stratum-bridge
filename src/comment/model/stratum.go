@@ -1,6 +1,14 @@
-package gostratum
+package model
 
 import "encoding/json"
+
+type StratumMethod string
+
+const (
+	StratumMethodSubscribe StratumMethod = "mining.subscribe"
+	StratumMethodAuthorize StratumMethod = "mining.authorize"
+	StratumMethodSubmit    StratumMethod = "mining.submit"
+)
 
 type JsonRpcEvent struct {
 	Id      any           `json:"id"` // id can be nil, a string, or an int 🙄

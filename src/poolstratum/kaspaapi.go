@@ -7,6 +7,7 @@ import (
 
 	"github.com/kaspanet/kaspad/app/appmessage"
 	"github.com/onemorebsmith/poolstratum/src/chainnode"
+	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	"github.com/onemorebsmith/poolstratum/src/prom"
 	"github.com/pkg/errors"
@@ -159,7 +160,7 @@ func (api *PoolApi) startBlockTemplateListener(ctx context.Context, blockReadyCb
 	} else if api.chainType == chainnode.ChainTypeAleo {
 		api.ChainNode.Listen(func(line string) error {
 			fmt.Println("aleoclient Listen", line)
-			event, err := gostratum.UnmarshalEvent(line)
+			event, err := M.UnmarshalEvent(line)
 			if err != nil {
 				api.logger.Error("error unmarshalling event", zap.String("raw", line))
 				return err

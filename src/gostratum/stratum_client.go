@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -17,7 +18,7 @@ func spawnClientListener(ctx *StratumContext, connection net.Conn, s *StratumLis
 
 	for {
 		err := readFromConnection(connection, func(line string) error {
-			event, err := UnmarshalEvent(line)
+			event, err := M.UnmarshalEvent(line)
 			if err != nil {
 				ctx.Logger.Error("error unmarshalling event", zap.String("raw", line))
 				return err

@@ -7,13 +7,14 @@ import (
 	"strings"
 	"sync"
 
+	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
 type DisconnectChannel chan *StratumContext
 type StateGenerator func() any
-type EventHandler func(ctx *StratumContext, event JsonRpcEvent) error
+type EventHandler func(ctx *StratumContext, event M.JsonRpcEvent) error
 
 type StratumClientListener interface {
 	OnConnect(ctx *StratumContext)
@@ -112,7 +113,7 @@ func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 
 }
 
-func (s *StratumListener) HandleEvent(ctx *StratumContext, event JsonRpcEvent) error {
+func (s *StratumListener) HandleEvent(ctx *StratumContext, event M.JsonRpcEvent) error {
 	if handler, exists := s.HandlerMap[string(event.Method)]; exists {
 		err := handler(ctx, event)
 		if err == nil {

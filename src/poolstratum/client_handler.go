@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	"github.com/onemorebsmith/poolstratum/src/prom"
 	"github.com/pkg/errors"
@@ -106,7 +107,7 @@ func (c *clientListener) NewBlockAvailable() {
 			}
 
 			// // normal notify flow
-			if err := client.Send(gostratum.JsonRpcEvent{
+			if err := client.Send(M.JsonRpcEvent{
 				Version: "2.0",
 				Method:  "mining.notify",
 				Id:      jobId,

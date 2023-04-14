@@ -16,6 +16,7 @@ import (
 	"github.com/kaspanet/kaspad/domain/consensus/utils/consensushashing"
 	"github.com/kaspanet/kaspad/domain/consensus/utils/pow"
 	"github.com/onemorebsmith/poolstratum/src/chainnode"
+	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	"github.com/onemorebsmith/poolstratum/src/mq"
 	"github.com/onemorebsmith/poolstratum/src/prom"
@@ -93,7 +94,7 @@ type submitInfo struct {
 	NonceVal uint64
 }
 
-func validateSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) (*submitInfo, error) {
+func validateSubmit(ctx *gostratum.StratumContext, event M.JsonRpcEvent) (*submitInfo, error) {
 	if len(event.Params) < 3 {
 		prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
 		return nil, fmt.Errorf("malformed event, expected at least 2 params")
@@ -149,7 +150,7 @@ func (sh *shareHandler) checkStales(ctx *gostratum.StratumContext, si *submitInf
 	return nil
 }
 
-func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent) error {
+func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event M.JsonRpcEvent) error {
 	submitInfo, err := validateSubmit(ctx, event)
 	if err != nil {
 		return err
@@ -250,7 +251,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		mq.Insertmqqt(ctx, string(jsonData), "Kaspa_Direct_Exchange", "Kaspa_Direct_Routing")
 	}
 
-	return ctx.Reply(gostratum.JsonRpcResponse{
+	return ctx.Reply(M.JsonRpcResponse{
 		Id:     event.Id,
 		Result: true,
 	})

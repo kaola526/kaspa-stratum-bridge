@@ -10,6 +10,7 @@ import (
 	"github.com/kaspanet/kaspad/domain/consensus/model/externalapi"
 	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
 	"github.com/onemorebsmith/poolstratum/src/chainnode/aleo/aleostratum"
+	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	psm "github.com/onemorebsmith/poolstratum/src/prom"
 	"github.com/pkg/errors"
@@ -57,12 +58,12 @@ type ChainNodeInterface interface {
 type ChainNode struct {
 	chainType string
 	kasaip    *rpcclient.RPCClient
-	aleoaip   *aleostratum.StratumClient
+	aleoaip   *aleostratum.AleoStratumClient
 }
 
 func CreateChainNode(chainType string, address string) (*ChainNode, error) {
 	var kasaip *rpcclient.RPCClient
-	var aleoaip *aleostratum.StratumClient
+	var aleoaip *aleostratum.AleoStratumClient
 	var err error
 	if chainType == ChainTypeKaspa {
 		kasaip, err = rpcclient.NewRPCClient(address)
@@ -165,7 +166,7 @@ func (chainnode *ChainNode) Listen(cb func(line string) error) error {
 }
 
 // 保存chain发送的work数据
-func (chainnode *ChainNode) SaveWork(work *gostratum.JsonRpcEvent) error {
+func (chainnode *ChainNode) SaveWork(work *M.JsonRpcEvent) error {
 	if chainnode.checkType(ChainTypeAleo) {
 		chainnode.aleoaip.LastWork = work
 		return nil
@@ -214,7 +215,7 @@ func (chainnode *ChainNode) GetNotifyParams(diff float64, client *gostratum.Stra
 			// first pass through send the difficulty since it's fixed
 			state.StratumDiff = psm.NewKaspaDiff()
 			state.StratumDiff.SetDiffValue(diff)
-			if err := client.Send(gostratum.JsonRpcEvent{
+			if err := client.Send(M.JsonRpcEvent{
 				Version: "2.0",
 				Method:  "mining.set_difficulty",
 				Params:  []any{state.StratumDiff.DiffValue},
