@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	// "github.com/kaspanet/kaspad/util"
 	"github.com/mattn/go-colorable"
 	"github.com/onemorebsmith/poolstratum/src/mq"
 	M "github.com/onemorebsmith/poolstratum/src/comment/model"
