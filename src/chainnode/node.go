@@ -10,8 +10,9 @@ import (
 	"github.com/kaspanet/kaspad/domain/consensus/model/externalapi"
 	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
 	"github.com/onemorebsmith/poolstratum/src/chainnode/aleo/aleostratum"
+	I "github.com/onemorebsmith/poolstratum/src/comment"
 	M "github.com/onemorebsmith/poolstratum/src/comment/model"
-	"github.com/onemorebsmith/poolstratum/src/gostratum"
+	// "github.com/onemorebsmith/poolstratum/src/gostratum"
 	psm "github.com/onemorebsmith/poolstratum/src/prom"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -57,11 +58,12 @@ type ChainNodeInterface interface {
 
 type ChainNode struct {
 	chainType string
+	Logger    *zap.SugaredLogger
 	kasaip    *rpcclient.RPCClient
 	aleoaip   *aleostratum.AleoStratumClient
 }
 
-func CreateChainNode(chainType string, address string) (*ChainNode, error) {
+func CreateChainNode(chainType string, address string, logger *zap.SugaredLogger) (*ChainNode, error) {
 	var kasaip *rpcclient.RPCClient
 	var aleoaip *aleostratum.AleoStratumClient
 	var err error
@@ -77,9 +79,10 @@ func CreateChainNode(chainType string, address string) (*ChainNode, error) {
 	}
 
 	return &ChainNode{
-		chainType,
-		kasaip,
-		aleoaip,
+		chainType: chainType,
+		Logger:    logger.With(zap.String("client", chainType)),
+		kasaip:    kasaip,
+		aleoaip:   aleoaip,
 	}, nil
 }
 
@@ -174,44 +177,44 @@ func (chainnode *ChainNode) SaveWork(work *M.JsonRpcEvent) error {
 	return fmt.Errorf(chainnode.chainType, " not Listen")
 }
 
-func (chainnode *ChainNode) GetNotifyParams(diff float64, client *gostratum.StratumContext) (int, []any, error) {
+func (chainnode *ChainNode) GetNotifyParams(diff float64, client I.WorkerClientInterface) (int, []any, error) {
 	var jobId int
 	var jobParams []any
 	if chainnode.checkType(ChainTypeKaspa) {
 		state := psm.GetMiningState(client)
-		if client.WalletAddr == "" {
+		if client.WalletAddr() == "" {
 			if time.Since(state.ConnectTime) > time.Second*20 { // timeout passed
 				// this happens pretty frequently in gcp/aws land since script-kiddies scrape ports
-				client.Logger.Warn("client misconfigured, no miner address specified - disconnecting", zap.String("client", client.String()))
-				psm.RecordWorkerError(client.WalletAddr, psm.ErrNoMinerAddress)
+				chainnode.Logger.Warn("client misconfigured, no miner address specified - disconnecting", zap.String("client", fmt.Sprintf(`%s/%s`, client.MinerName(), client.DeviceName())))
+				psm.RecordWorkerError(client.WalletAddr(), psm.ErrNoMinerAddress)
 				client.Disconnect() // invalid configuration, boot the worker
 			}
 			return 0, nil, fmt.Errorf("client wallet address is null")
 		}
-		template, err := chainnode.GetBlockTemplate(client.WalletAddr, fmt.Sprintf(`'%s' client %s/%s`, client.MinerName, client.AppName, client.AppVersion))
+		template, err := chainnode.GetBlockTemplate(client.WalletAddr(), fmt.Sprintf(`'%s' client`, client.MinerName()))
 		if err != nil {
 			if strings.Contains(err.Error(), "Could not decode address") {
-				psm.RecordWorkerError(client.WalletAddr, psm.ErrInvalidAddressFmt)
-				client.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa, malformed address: %s", err))
+				psm.RecordWorkerError(client.WalletAddr(), psm.ErrInvalidAddressFmt)
+				chainnode.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa, malformed address: %s", err))
 				client.Disconnect() // unrecoverable
 			} else {
-				psm.RecordWorkerError(client.WalletAddr, psm.ErrFailedBlockFetch)
-				client.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
+				psm.RecordWorkerError(client.WalletAddr(), psm.ErrFailedBlockFetch)
+				chainnode.Logger.Error(fmt.Sprintf("failed fetching new block template from kaspa: %s", err))
 			}
 			return 0, nil, err
 		}
 		state.BigDiff = psm.CalculateTarget(uint64(template.Block.Header.Bits))
 		header, err := psm.SerializeBlockHeader(template.Block)
 		if err != nil {
-			psm.RecordWorkerError(client.WalletAddr, psm.ErrBadDataFromMiner)
-			client.Logger.Error(fmt.Sprintf("failed to serialize block header: %s", err))
+			psm.RecordWorkerError(client.WalletAddr(), psm.ErrBadDataFromMiner)
+			chainnode.Logger.Error(fmt.Sprintf("failed to serialize block header: %s", err))
 			return 0, nil, err
 		}
 
 		jobId = state.AddJob(template.Block)
 		if !state.Initialized {
 			state.Initialized = true
-			state.UseBigJob = bigJobRegex.MatchString(client.MinerName)
+			state.UseBigJob = bigJobRegex.MatchString(client.MinerName())
 			// first pass through send the difficulty since it's fixed
 			state.StratumDiff = psm.NewKaspaDiff()
 			state.StratumDiff.SetDiffValue(diff)
@@ -220,8 +223,8 @@ func (chainnode *ChainNode) GetNotifyParams(diff float64, client *gostratum.Stra
 				Method:  "mining.set_difficulty",
 				Params:  []any{state.StratumDiff.DiffValue},
 			}); err != nil {
-				psm.RecordWorkerError(client.WalletAddr, psm.ErrFailedSetDiff)
-				client.Logger.Error(errors.Wrap(err, "failed sending difficulty").Error(), zap.Any("context", client))
+				psm.RecordWorkerError(client.WalletAddr(), psm.ErrFailedSetDiff)
+				chainnode.Logger.Error(errors.Wrap(err, "failed sending difficulty").Error(), zap.Any("context", client))
 				return 0, nil, err
 			}
 		}

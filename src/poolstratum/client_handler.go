@@ -114,18 +114,18 @@ func (c *clientListener) NewBlockAvailable() {
 				Params:  jobParams,
 			}); err != nil {
 				if errors.Is(err, gostratum.ErrorDisconnected) {
-					prom.RecordWorkerError(client.WalletAddr, prom.ErrDisconnected)
+					prom.RecordWorkerError(client.WalletAddr(), prom.ErrDisconnected)
 					return
 				}
-				prom.RecordWorkerError(client.WalletAddr, prom.ErrFailedSendWork)
+				prom.RecordWorkerError(client.WalletAddr(), prom.ErrFailedSendWork)
 				client.Logger.Error(errors.Wrapf(err, "failed sending work packet %d", jobId).Error())
 			}
 
 			prom.RecordNewJob(client)
 		}(cl)
 
-		if cl.WalletAddr != "" {
-			addresses = append(addresses, cl.WalletAddr)
+		if cl.WalletAddr() != "" {
+			addresses = append(addresses, cl.WalletAddr())
 		}
 	}
 	c.clientLock.Unlock()

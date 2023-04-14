@@ -24,7 +24,7 @@ type PoolApi struct {
 }
 
 func NewPoolAPI(chain_type string, address string, blockWaitTime time.Duration, logger *zap.SugaredLogger) (*PoolApi, error) {
-	chainnode, err := chainnode.CreateChainNode(chain_type, address)
+	chainnode, err := chainnode.CreateChainNode(chain_type, address, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (api *PoolApi) reconnect() error {
 		return api.ChainNode.Reconnect()
 	}
 
-	client, err := chainnode.CreateChainNode(api.chainType, api.address)
+	client, err := chainnode.CreateChainNode(api.chainType, api.address, api.logger)
 	if err != nil {
 		return err
 	}
@@ -174,7 +174,7 @@ func (api *PoolApi) startBlockTemplateListener(ctx context.Context, blockReadyCb
 
 func (api *PoolApi) GetBlockTemplate(
 	client *gostratum.StratumContext) (*appmessage.GetBlockTemplateResponseMessage, error) {
-	template, err := api.ChainNode.GetBlockTemplate(client.WalletAddr,
+	template, err := api.ChainNode.GetBlockTemplate(client.WalletAddr(),
 		fmt.Sprintf(`'%s' via onemorebsmith/kaspa-stratum-bridge_%s`, client.MinerName, version))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed fetching new block template from kaspa")

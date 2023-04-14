@@ -3,15 +3,14 @@ package gostratum
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kaspanet/kaspad/util"
+	// "github.com/kaspanet/kaspad/util"
 	"github.com/mattn/go-colorable"
 	"github.com/onemorebsmith/poolstratum/src/mq"
 	M "github.com/onemorebsmith/poolstratum/src/comment/model"
+	util "github.com/onemorebsmith/poolstratum/src/chainnode"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -60,15 +59,15 @@ func HandleAuthorize(ctx *StratumContext, event M.JsonRpcEvent) error {
 	}
 
 	var err error
-	address, err := CleanWallet("kaspa:qzn4fltcsh30n22f6zszvuy9pkzjnmz97dcvm740wd5l98dqw94q6s820ggvg")
+	address, err := util.CleanWallet(ctx.AppName, "kaspa:qzn4fltcsh30n22f6zszvuy9pkzjnmz97dcvm740wd5l98dqw94q6s820ggvg")
 	if err != nil {
 		return fmt.Errorf("invalid wallet format %s: %w", address, err)
 	}
 
-	ctx.WalletAddr = address
-	ctx.MinerName = minername
-	ctx.DeviceName = devicename
-	ctx.Logger = ctx.Logger.With(zap.String("worker", ctx.DeviceName), zap.String("addr", ctx.WalletAddr))
+	ctx.walletAddr = address
+	ctx.minerName = minername
+	ctx.deviceName = devicename
+	ctx.Logger = ctx.Logger.With(zap.String("worker", ctx.deviceName), zap.String("addr", ctx.walletAddr))
 
 	if err := ctx.Reply(M.NewResponse(event, true, nil)); err != nil {
 		return errors.Wrap(err, "failed to send response to authorize")
@@ -82,11 +81,11 @@ func HandleAuthorize(ctx *StratumContext, event M.JsonRpcEvent) error {
 		AppName:       ctx.AppName,
 		AppVersion:    ctx.AppVersion,
 		RecodeType:    "Login",
-		MinerName:     ctx.MinerName,
+		MinerName:     ctx.minerName,
 		DeviceCompany: ctx.DeviceCompany,
 		DeviceType:    ctx.DeviceType,
-		DeviceName:    ctx.DeviceName,
-		RemoteAddr:    ctx.RemoteAddr,
+		DeviceName:    ctx.deviceName,
+		RemoteAddr:    ctx.remoteAddr,
 		Time:          time.Now().UnixNano() / int64(time.Millisecond),
 	}
 
@@ -146,22 +145,4 @@ func SendExtranonce(ctx *StratumContext) {
 		// should we doing anything further on failure
 		ctx.Logger.Error(errors.Wrap(err, "failed to set extranonce").Error(), zap.Any("context", ctx))
 	}
-}
-
-var walletRegex = regexp.MustCompile("kaspa:[a-z0-9]+")
-
-func CleanWallet(in string) (string, error) {
-	_, err := util.DecodeAddress(in, util.Bech32PrefixKaspa)
-	if err == nil {
-		return in, nil // good to go
-	}
-	if !strings.HasPrefix(in, "kaspa:") {
-		return CleanWallet("kaspa:" + in)
-	}
-
-	// has kaspa: prefix but other weirdness somewhere
-	if walletRegex.MatchString(in) {
-		return in[0:67], nil
-	}
-	return "", errors.New("unable to coerce wallet to valid kaspa address")
 }

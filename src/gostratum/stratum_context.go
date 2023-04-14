@@ -19,19 +19,19 @@ type StratumContext struct {
 	parentContext    context.Context
 	AppName          string
 	AppVersion       string
-	MinerName        string
+	minerName        string
 	DeviceCompany    string
 	DeviceType       string
-	DeviceName       string
-	RemoteAddr       string
-	WalletAddr       string
+	deviceName       string
+	remoteAddr       string
+	walletAddr       string
 	TargetDifficulty int64
 	Id               int32
 	Logger           *zap.Logger
 	connection       net.Conn
 	disconnecting    bool
 	onDisconnect     chan *StratumContext
-	State            any // gross, but go generics aren't mature enough this can be typed 😭
+	state            any // gross, but go generics aren't mature enough this can be typed 😭
 	writeLock        int32
 	Extranonce       string
 }
@@ -51,10 +51,10 @@ func (sc *StratumContext) Connected() bool {
 
 func (sc *StratumContext) Summary() ContextSummary {
 	return ContextSummary{
-		RemoteAddr: sc.RemoteAddr,
-		WalletAddr: sc.WalletAddr,
-		DeviceName: sc.DeviceName,
-		MinerName:  sc.MinerName,
+		RemoteAddr: sc.remoteAddr,
+		WalletAddr: sc.walletAddr,
+		DeviceName: sc.deviceName,
+		MinerName:  sc.minerName,
 	}
 }
 
@@ -62,11 +62,11 @@ func NewMockContext(ctx context.Context, logger *zap.Logger, state any) (*Stratu
 	mc := NewMockConnection()
 	return &StratumContext{
 		parentContext: ctx,
-		State:         state,
-		RemoteAddr:    "127.0.0.1",
-		WalletAddr:    uuid.NewString(),
-		DeviceName:    uuid.NewString(),
-		MinerName:     "mock.context",
+		state:         state,
+		remoteAddr:    "127.0.0.1",
+		walletAddr:    uuid.NewString(),
+		deviceName:    uuid.NewString(),
+		minerName:     "mock.context",
 		Logger:        logger,
 		connection:    mc,
 	}, mc
@@ -174,11 +174,11 @@ func (sc *StratumContext) Disconnect() {
 			AppName:       sc.AppName,
 			AppVersion:    sc.AppVersion,
 			RecodeType:    "Logout",
-			MinerName:     sc.MinerName,
+			MinerName:     sc.minerName,
 			DeviceCompany: sc.DeviceCompany,
 			DeviceType:    sc.DeviceType,
-			DeviceName:    sc.DeviceName,
-			RemoteAddr:    sc.RemoteAddr,
+			DeviceName:    sc.deviceName,
+			RemoteAddr:    sc.remoteAddr,
 			Time:          time.Now().UnixNano() / int64(time.Millisecond),
 		}
 
@@ -218,4 +218,24 @@ func (StratumContext) Err() error {
 
 func (d StratumContext) Value(key any) any {
 	return d.parentContext.Value(key)
+}
+
+func (d StratumContext) MinerName() string {
+	return d.minerName
+}
+
+func (d StratumContext) DeviceName() string {
+	return d.deviceName
+}
+
+func (d StratumContext) WalletAddr() string {
+	return d.walletAddr
+}
+
+func (d StratumContext) RemoteAddr() string {
+	return d.remoteAddr
+}
+
+func (d StratumContext) State() any {
+	return d.state
 }

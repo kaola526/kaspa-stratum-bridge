@@ -96,10 +96,10 @@ func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 	}
 	clientContext := &StratumContext{
 		parentContext: ctx,
-		RemoteAddr:    addr,
+		remoteAddr:    addr,
 		Logger:        s.Logger.With(zap.String("client", addr)),
 		connection:    connection,
-		State:         s.StateGenerator(),
+		state:         s.StateGenerator(),
 		onDisconnect:  s.disconnectChannel,
 	}
 

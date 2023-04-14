@@ -57,26 +57,26 @@ func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats
 	sh.statsLock.Lock()
 	var stats *WorkStats
 	found := false
-	if ctx.DeviceName != "" {
-		stats, found = sh.stats[ctx.DeviceName]
+	if ctx.DeviceName() != "" {
+		stats, found = sh.stats[ctx.DeviceName()]
 	}
 	if !found { // no worker name, check by remote address
-		stats, found = sh.stats[ctx.RemoteAddr]
+		stats, found = sh.stats[ctx.RemoteAddr()]
 		if found {
 			// no worker name, but remote addr is there
 			// so replacet the remote addr with the worker names
 			// TOOD，代码存在问题
-			delete(sh.stats, ctx.RemoteAddr)
-			stats.DeviceName = ctx.DeviceName
-			sh.stats[ctx.DeviceName] = stats
+			delete(sh.stats, ctx.RemoteAddr())
+			stats.DeviceName = ctx.DeviceName()
+			sh.stats[ctx.DeviceName()] = stats
 		}
 	}
 	if !found { // legit doesn't exist, create it
 		stats = &WorkStats{}
 		stats.LastShare = time.Now()
-		stats.DeviceName = ctx.RemoteAddr
+		stats.DeviceName = ctx.RemoteAddr()
 		stats.StartTime = time.Now()
-		sh.stats[ctx.RemoteAddr] = stats
+		sh.stats[ctx.RemoteAddr()] = stats
 
 		// TODO: not sure this is the best place, nor whether we shouldn't be
 		// resetting on disconnect
@@ -96,28 +96,28 @@ type submitInfo struct {
 
 func validateSubmit(ctx *gostratum.StratumContext, event M.JsonRpcEvent) (*submitInfo, error) {
 	if len(event.Params) < 3 {
-		prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
+		prom.RecordWorkerError(ctx.WalletAddr(), prom.ErrBadDataFromMiner)
 		return nil, fmt.Errorf("malformed event, expected at least 2 params")
 	}
 	jobIdStr, ok := event.Params[1].(string)
 	if !ok {
-		prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
+		prom.RecordWorkerError(ctx.WalletAddr(), prom.ErrBadDataFromMiner)
 		return nil, fmt.Errorf("unexpected type for param 1: %+v", event.Params...)
 	}
 	jobId, err := strconv.ParseInt(jobIdStr, 10, 0)
 	if err != nil {
-		prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
+		prom.RecordWorkerError(ctx.WalletAddr(), prom.ErrBadDataFromMiner)
 		return nil, errors.Wrap(err, "job id is not parsable as an number")
 	}
 	state := prom.GetMiningState(ctx)
 	block, exists := state.GetJob(int(jobId))
 	if !exists {
-		prom.RecordWorkerError(ctx.WalletAddr, prom.ErrMissingJob)
+		prom.RecordWorkerError(ctx.WalletAddr(), prom.ErrMissingJob)
 		return nil, fmt.Errorf("job does not exist. stale?")
 	}
 	noncestr, ok := event.Params[2].(string)
 	if !ok {
-		prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
+		prom.RecordWorkerError(ctx.WalletAddr(), prom.ErrBadDataFromMiner)
 		return nil, fmt.Errorf("unexpected type for param 2: %+v", event.Params...)
 	}
 	return &submitInfo{
@@ -171,13 +171,13 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event M.Json
 	if state.UseBigJob {
 		submitInfo.NonceVal, err = strconv.ParseUint(submitInfo.Noncestr, 16, 64)
 		if err != nil {
-			prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
+			prom.RecordWorkerError(ctx.WalletAddr(), prom.ErrBadDataFromMiner)
 			return errors.Wrap(err, "failed parsing noncestr")
 		}
 	} else {
 		submitInfo.NonceVal, err = strconv.ParseUint(submitInfo.Noncestr, 16, 64)
 		if err != nil {
-			prom.RecordWorkerError(ctx.WalletAddr, prom.ErrBadDataFromMiner)
+			prom.RecordWorkerError(ctx.WalletAddr(), prom.ErrBadDataFromMiner)
 			return errors.Wrap(err, "failed parsing noncestr")
 		}
 	}
@@ -235,11 +235,11 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event M.Json
 		AppName:          ctx.AppName,
 		AppVersion:       ctx.AppVersion,
 		RecodeType:       "submit",
-		MinerName:        ctx.MinerName,
+		MinerName:        ctx.MinerName(),
 		DeviceCompany:    ctx.DeviceCompany,
 		DeviceType:       ctx.DeviceType,
-		DeviceName:       ctx.DeviceName,
-		RemoteAddr:       ctx.RemoteAddr,
+		DeviceName:       ctx.DeviceName(),
+		RemoteAddr:       ctx.RemoteAddr(),
 		Time:             time.Now().UnixNano() / int64(time.Millisecond),
 		Code:             0,
 		TargetDifficulty: uint64(state.StratumDiff.DiffValue),

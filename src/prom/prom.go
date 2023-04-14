@@ -6,11 +6,11 @@ import (
 	"sync"
 
 	"github.com/kaspanet/kaspad/app/appmessage"
-	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
+	I "github.com/onemorebsmith/poolstratum/src/comment"
 )
 
 var workerLabels = []string{
@@ -77,45 +77,45 @@ var networkBlockCount = promauto.NewGauge(prometheus.GaugeOpts{
 	Help: "Gauge representing the network block count",
 })
 
-func commonLabels(worker *gostratum.StratumContext) prometheus.Labels {
+func commonLabels(worker I.WorkerClientInterface) prometheus.Labels {
 	return prometheus.Labels{
-		"worker": worker.DeviceName,
-		"miner":  worker.MinerName,
-		"wallet": worker.WalletAddr,
-		"ip":     worker.RemoteAddr,
+		"worker": worker.DeviceName(),
+		"miner":  worker.MinerName(),
+		"wallet": worker.WalletAddr(),
+		"ip":     worker.RemoteAddr(),
 	}
 }
 
-func RecordShareFound(worker *gostratum.StratumContext, shareDiff float64) {
+func RecordShareFound(worker I.WorkerClientInterface, shareDiff float64) {
 	shareCounter.With(commonLabels(worker)).Inc()
 	shareDiffCounter.With(commonLabels(worker)).Add(shareDiff)
 }
 
-func RecordStaleShare(worker *gostratum.StratumContext) {
+func RecordStaleShare(worker I.WorkerClientInterface) {
 	labels := commonLabels(worker)
 	labels["type"] = "stale"
 	invalidCounter.With(labels).Inc()
 }
 
-func RecordDupeShare(worker *gostratum.StratumContext) {
+func RecordDupeShare(worker I.WorkerClientInterface) {
 	labels := commonLabels(worker)
 	labels["type"] = "duplicate"
 	invalidCounter.With(labels).Inc()
 }
 
-func RecordInvalidShare(worker *gostratum.StratumContext) {
+func RecordInvalidShare(worker I.WorkerClientInterface) {
 	labels := commonLabels(worker)
 	labels["type"] = "invalid"
 	invalidCounter.With(labels).Inc()
 }
 
-func RecordWeakShare(worker *gostratum.StratumContext) {
+func RecordWeakShare(worker I.WorkerClientInterface) {
 	labels := commonLabels(worker)
 	labels["type"] = "weak"
 	invalidCounter.With(labels).Inc()
 }
 
-func RecordBlockFound(worker *gostratum.StratumContext, nonce, bluescore uint64, hash string) {
+func RecordBlockFound(worker I.WorkerClientInterface, nonce, bluescore uint64, hash string) {
 	blockCounter.With(commonLabels(worker)).Inc()
 	labels := commonLabels(worker)
 	labels["nonce"] = fmt.Sprintf("%d", nonce)
@@ -124,11 +124,11 @@ func RecordBlockFound(worker *gostratum.StratumContext, nonce, bluescore uint64,
 	blockGauge.With(labels).Set(1)
 }
 
-func RecordDisconnect(worker *gostratum.StratumContext) {
+func RecordDisconnect(worker I.WorkerClientInterface) {
 	disconnectCounter.With(commonLabels(worker)).Inc()
 }
 
-func RecordNewJob(worker *gostratum.StratumContext) {
+func RecordNewJob(worker I.WorkerClientInterface) {
 	jobCounter.With(commonLabels(worker)).Inc()
 }
 
@@ -145,13 +145,13 @@ func RecordWorkerError(address string, shortError ErrorShortCodeT) {
 	}).Inc()
 }
 
-func InitInvalidCounter(worker *gostratum.StratumContext, errorType string) {
+func InitInvalidCounter(worker I.WorkerClientInterface, errorType string) {
 	labels := commonLabels(worker)
 	labels["type"] = errorType
 	invalidCounter.With(labels).Add(0)
 }
 
-func InitWorkerCounters(worker *gostratum.StratumContext) {
+func InitWorkerCounters(worker I.WorkerClientInterface) {
 	labels := commonLabels(worker)
 
 	shareCounter.With(labels).Add(0)

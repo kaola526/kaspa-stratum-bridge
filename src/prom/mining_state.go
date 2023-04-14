@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/kaspanet/kaspad/app/appmessage"
-	"github.com/onemorebsmith/poolstratum/src/gostratum"
+	I "github.com/onemorebsmith/poolstratum/src/comment"
 )
 
 const maxjobs = 32
@@ -30,8 +30,8 @@ func MiningStateGenerator() any {
 	}
 }
 
-func GetMiningState(ctx *gostratum.StratumContext) *MiningState {
-	return ctx.State.(*MiningState)
+func GetMiningState(ctx I.WorkerClientInterface) *MiningState {
+	return ctx.State().(*MiningState)
 }
 
 func (ms *MiningState) AddJob(job *appmessage.RPCBlock) int {
