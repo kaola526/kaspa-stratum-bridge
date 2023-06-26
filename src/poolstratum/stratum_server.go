@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/mattn/go-colorable"
-	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	"github.com/onemorebsmith/poolstratum/src/gostratum"
 	"github.com/onemorebsmith/poolstratum/src/prom"
 	"go.uber.org/zap"
@@ -97,29 +96,21 @@ func ListenAndServe(cfg BridgeConfig) error {
 	}
 
 	shareHandler := NewShareHandler(poolApi.ChainNode)
-	clientHandler := newWorkersAuthenticListener(poolApi, logger, shareHandler, float64(minDiff), int8(extranonceSize))
+	workersListener := newWorkersAuthenticListener(poolApi, logger, shareHandler, float64(minDiff), int8(extranonceSize))
 
-	// override the submit handler with an actual useful handler
-	handlers[string(M.StratumMethodSubmit)] =
-		func(ctx *gostratum.WorkerContext, event M.JsonRpcEvent) error {
-			if err := shareHandler.HandleSubmit(ctx, event); err != nil {
-				ctx.Logger.Sugar().Error(err) // sink error
-			}
-			return nil
-		}
-
-	// poolApi.ProxyHandlers(handlers)
+	handlers = shareHandler.ProxyHandlers(handlers)
+	handlers = workersListener.ProxyHandlers(handlers)
 
 	stratumConfig := gostratum.StratumListenerConfig{
 		Port:           cfg.StratumPort,
 		HandlerMap:     handlers,
 		StateGenerator: prom.MiningStateGenerator,
-		ClientListener: clientHandler,
+		ClientListener: workersListener,
 		Logger:         logger.Desugar(),
 	}
 
 	poolApi.Start(ctx, func() {
-		clientHandler.NewBlockAvailable()
+		workersListener.NewBlockAvailable()
 	})
 
 	if cfg.PrintStats {

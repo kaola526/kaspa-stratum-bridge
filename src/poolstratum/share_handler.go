@@ -53,6 +53,14 @@ func NewShareHandler(poolapi *chainnode.ChainNode) *ShareHandler {
 	}
 }
 
+func (sh *ShareHandler) ProxyHandlers(handlerMap gostratum.StratumHandlerMap) gostratum.StratumHandlerMap {
+	return gostratum.StratumHandlerMap{
+		string(M.StratumMethodSubscribe): handlerMap[string(M.StratumMethodSubscribe)],
+		string(M.StratumMethodAuthorize): handlerMap[string(M.StratumMethodAuthorize)],
+		string(M.StratumMethodSubmit):    sh.HandleSubmit,
+	}
+}
+
 func (sh *ShareHandler) getCreateStats(ctx *gostratum.WorkerContext) *WorkStats {
 	sh.statsLock.Lock()
 	var stats *WorkStats
@@ -150,9 +158,9 @@ func (sh *ShareHandler) checkStales(ctx *gostratum.WorkerContext, si *submitInfo
 	return nil
 }
 
-func (sh *ShareHandler) HandleSubmit(ctx *gostratum.WorkerContext, event M.JsonRpcEvent) error {
+func (sh *ShareHandler) HandleSubmit(workerCtx *gostratum.WorkerContext, event M.JsonRpcEvent) error {
 	if sh.poolapi.IsKaspa() {
-		return sh.TempKaspHandleSubmit(ctx, event)
+		return sh.TempKaspHandleSubmit(workerCtx, event)
 	}
 
 	if sh.poolapi.IsAleo() {
@@ -162,38 +170,38 @@ func (sh *ShareHandler) HandleSubmit(ctx *gostratum.WorkerContext, event M.JsonR
 	return nil
 }
 
-func (sh *ShareHandler) TempKaspHandleSubmit(ctx *gostratum.WorkerContext, event M.JsonRpcEvent) error {
-	submitInfo, err := validateSubmit(ctx, event)
+func (sh *ShareHandler) TempKaspHandleSubmit(workerCtx *gostratum.WorkerContext, event M.JsonRpcEvent) error {
+	submitInfo, err := validateSubmit(workerCtx, event)
 	if err != nil {
 		return err
 	}
 
 	// add extranonce to noncestr if enabled and submitted nonce is shorter than
 	// expected (16 - <extranonce length> characters)
-	if ctx.Extranonce != "" {
-		extranonce2Len := 16 - len(ctx.Extranonce)
+	if workerCtx.Extranonce != "" {
+		extranonce2Len := 16 - len(workerCtx.Extranonce)
 		if len(submitInfo.Noncestr) <= extranonce2Len {
-			submitInfo.Noncestr = ctx.Extranonce + fmt.Sprintf("%0*s", extranonce2Len, submitInfo.Noncestr)
+			submitInfo.Noncestr = workerCtx.Extranonce + fmt.Sprintf("%0*s", extranonce2Len, submitInfo.Noncestr)
 		}
 	}
 
 	//ctx.Logger.Debug(submitInfo.block.Header.BlueScore, " submit ", submitInfo.noncestr)
 	// TODO：bug
-	state := prom.GetMiningState(ctx)
+	state := prom.GetMiningState(workerCtx)
 	if state.UseBigJob {
 		submitInfo.NonceVal, err = strconv.ParseUint(submitInfo.Noncestr, 16, 64)
 		if err != nil {
-			prom.RecordWorkerError(ctx.WalletAddr(), prom.ErrBadDataFromMiner)
+			prom.RecordWorkerError(workerCtx.WalletAddr(), prom.ErrBadDataFromMiner)
 			return errors.Wrap(err, "failed parsing noncestr")
 		}
 	} else {
 		submitInfo.NonceVal, err = strconv.ParseUint(submitInfo.Noncestr, 16, 64)
 		if err != nil {
-			prom.RecordWorkerError(ctx.WalletAddr(), prom.ErrBadDataFromMiner)
+			prom.RecordWorkerError(workerCtx.WalletAddr(), prom.ErrBadDataFromMiner)
 			return errors.Wrap(err, "failed parsing noncestr")
 		}
 	}
-	stats := sh.getCreateStats(ctx)
+	stats := sh.getCreateStats(workerCtx)
 
 	// TODO 校验event是否过期
 	// if err := sh.checkStales(ctx, submitInfo); err != nil {
@@ -224,7 +232,7 @@ func (sh *ShareHandler) TempKaspHandleSubmit(ctx *gostratum.WorkerContext, event
 
 	// The block hash must be less or equal than the claimed target.
 	if powValue.Cmp(&powState.Target) <= 0 {
-		if err := sh.submit(ctx, converted, submitInfo.NonceVal, event.Id); err != nil {
+		if err := sh.submit(workerCtx, converted, submitInfo.NonceVal, event.Id); err != nil {
 			return err
 		}
 	}
@@ -240,20 +248,20 @@ func (sh *ShareHandler) TempKaspHandleSubmit(ctx *gostratum.WorkerContext, event
 	stats.SharesDiff.Add(state.StratumDiff.HashValue)
 	stats.LastShare = time.Now()
 	sh.overall.SharesFound.Add(1)
-	prom.RecordShareFound(ctx, state.StratumDiff.HashValue)
+	prom.RecordShareFound(workerCtx, state.StratumDiff.HashValue)
 
 	params, _ := json.Marshal(submitInfo)
 
 	mqDate := mq.MQShareRecordData{
 		MessageId:        uuid.New().String(),
-		AppName:          ctx.AppName,
-		AppVersion:       ctx.AppVersion,
+		AppName:          workerCtx.AppName,
+		AppVersion:       workerCtx.AppVersion,
 		RecodeType:       "submit",
-		MinerName:        ctx.MinerName(),
-		DeviceCompany:    ctx.DeviceCompany,
-		DeviceType:       ctx.DeviceType,
-		DeviceName:       ctx.DeviceName(),
-		RemoteAddr:       ctx.RemoteAddr(),
+		MinerName:        workerCtx.MinerName(),
+		DeviceCompany:    workerCtx.DeviceCompany,
+		DeviceType:       workerCtx.DeviceType,
+		DeviceName:       workerCtx.DeviceName(),
+		RemoteAddr:       workerCtx.RemoteAddr(),
 		Time:             time.Now().UnixNano() / int64(time.Millisecond),
 		Code:             0,
 		TargetDifficulty: uint64(state.StratumDiff.DiffValue),
@@ -262,10 +270,10 @@ func (sh *ShareHandler) TempKaspHandleSubmit(ctx *gostratum.WorkerContext, event
 
 	jsonData, err := json.MarshalIndent(mqDate, "", "  ")
 	if err == nil {
-		mq.Insertmqqt(ctx, string(jsonData), "Kaspa_Direct_Exchange", "Kaspa_Direct_Routing")
+		mq.Insertmqqt(workerCtx, string(jsonData), "Kaspa_Direct_Exchange", "Kaspa_Direct_Routing")
 	}
 
-	return ctx.Reply(M.JsonRpcResponse{
+	return workerCtx.Reply(M.JsonRpcResponse{
 		Id:     event.Id,
 		Result: true,
 	})

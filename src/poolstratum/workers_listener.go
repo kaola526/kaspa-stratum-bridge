@@ -32,7 +32,7 @@ type workersAuthenticListener struct {
 
 func newWorkersAuthenticListener(poolApi *PoolApi, logger *zap.SugaredLogger, shareHandler *ShareHandler, minShareDiff float64, extranonceSize int8) *workersAuthenticListener {
 	return &workersAuthenticListener{
-		logger:         logger.Named("[clientListener]"),
+		logger:         logger.Named("[workersAuthenticListener]"),
 		minShareDiff:   minShareDiff,
 		extranonceSize: extranonceSize,
 		maxExtranonce:  int32(math.Pow(2, (8*math.Min(float64(extranonceSize), 3))) - 1),
@@ -143,4 +143,83 @@ func (c *workersAuthenticListener) NewBlockAvailable() {
 			}()
 		}
 	}
+}
+
+func (c *workersAuthenticListener) ProxyHandlers(handlerMap gostratum.StratumHandlerMap) gostratum.StratumHandlerMap {
+
+	return gostratum.StratumHandlerMap{
+		string(M.StratumMethodSubscribe): c.HandleSubscribe,
+		string(M.StratumMethodAuthorize): c.HandleAuthorize,
+		string(M.StratumMethodSubmit):    handlerMap[string(M.StratumMethodSubmit)],
+	}
+}
+
+func (c *workersAuthenticListener) HandleSubscribe(workerCtx *gostratum.WorkerContext, event M.JsonRpcEvent) error {
+	c.logger.Info(fmt.Sprintf("HandleSubscribe event %v", event));
+	if c.poolApi.ChainNode.IsAleo() {
+		if err := workerCtx.Reply(M.NewResponse(event,
+			[]any{workerCtx.Extranonce}, nil)); err != nil {
+			return errors.Wrap(err, "failed to send response to subscribe")
+		}
+		if len(event.Params) > 0 {
+			app, ok := event.Params[0].(string)
+			if ok {
+				workerCtx.AppName = app
+			}
+		}
+		if len(event.Params) > 1 {
+			version, ok := event.Params[1].(string)
+			if ok {
+				workerCtx.AppVersion = version
+			}
+		}
+		if len(event.Params) > 2 {
+			deviceCompany, ok := event.Params[2].(string)
+			if ok {
+				workerCtx.DeviceCompany = deviceCompany
+			}
+		}
+		if len(event.Params) > 3 {
+			deviceType, ok := event.Params[3].(string)
+			if ok {
+				workerCtx.DeviceType = deviceType
+			}
+		}
+	}
+	if c.poolApi.ChainNode.IsKaspa() {
+		if err := workerCtx.Reply(M.NewResponse(event,
+			[]any{true, "kaspa/1.0.0"}, nil)); err != nil {
+			return errors.Wrap(err, "failed to send response to subscribe")
+		}
+		if len(event.Params) > 0 {
+			app, ok := event.Params[0].(string)
+			if ok {
+				workerCtx.AppName = app
+			}
+		}
+		if len(event.Params) > 1 {
+			version, ok := event.Params[1].(string)
+			if ok {
+				workerCtx.AppVersion = version
+			}
+		}
+		if len(event.Params) > 2 {
+			deviceCompany, ok := event.Params[2].(string)
+			if ok {
+				workerCtx.DeviceCompany = deviceCompany
+			}
+		}
+		if len(event.Params) > 3 {
+			deviceType, ok := event.Params[3].(string)
+			if ok {
+				workerCtx.DeviceType = deviceType
+			}
+		}
+	}
+	return nil
+}
+
+func (c *workersAuthenticListener) HandleAuthorize(workerCtx *gostratum.WorkerContext, event M.JsonRpcEvent) error {
+	c.logger.Info(fmt.Sprintf("HandleAuthorize event %v", event));
+	return workerCtx.HandleAuthorize(event)
 }
