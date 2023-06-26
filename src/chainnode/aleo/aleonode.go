@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/onemorebsmith/poolstratum/src/chainnode/aleo/aleostratum"
+	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	"go.uber.org/zap"
 )
 
@@ -34,24 +35,24 @@ func NewAleoNode(address string, blockWaitTime time.Duration, logger *zap.Sugare
 	return &AleoNode{
 		address:       address,
 		blockWaitTime: blockWaitTime,
-		logger:        logger.With(zap.String("component", "aleo:"+address)),
+		logger:        logger.Named("[NewAleoNode]"),
 		aleoclient:    client,
 		connected:     true,
 	}, nil
 }
 
 func (ks *AleoNode) Start(ctx context.Context, blockCb func()) {
-	fmt.Print("AleoNode Start")
+	ks.logger.Info("AleoNode Start")
 	go func(ctx context.Context, blockCb func()) {
 		for {
-			fmt.Print("AleoNode Subscribe\n")
+			ks.logger.Info("AleoNode Subscribe")
 			err := ks.aleoclient.Subscribe()
 			if err != nil {
 				ks.logger.Error("subscribe err ", err)
 				time.Sleep(time.Second * 5)
 				continue
 			}
-			fmt.Print("AleoNode Authorize\n")
+			ks.logger.Info("AleoNode Authorize\n")
 			err = ks.aleoclient.Authorize()
 			if err != nil {
 				ks.logger.Error("authorize err ", err)
@@ -70,4 +71,24 @@ func (ks *AleoNode) startBlockTemplateListener(ctx context.Context, blockCb func
 		fmt.Println("aleoclient Listen", line)
 		return nil
 	})
+}
+
+func (ks *AleoNode) Subscribe() error {
+	return ks.aleoclient.Subscribe()
+}
+
+func (ks *AleoNode) Authorize() error {
+	return ks.aleoclient.Authorize()
+}
+
+func (ks *AleoNode) Listen(cb aleostratum.LineCallback) error {
+	return ks.aleoclient.Listen(cb)
+}
+
+func (ks *AleoNode) SetLastWork(work *M.JsonRpcEvent) {
+	ks.aleoclient.LastWork = work;
+}
+
+func (ks *AleoNode) GetLastWork() *M.JsonRpcEvent{
+	return ks.aleoclient.LastWork;
 }

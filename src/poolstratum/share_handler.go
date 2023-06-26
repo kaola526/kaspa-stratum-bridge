@@ -151,6 +151,18 @@ func (sh *ShareHandler) checkStales(ctx *gostratum.WorkerContext, si *submitInfo
 }
 
 func (sh *ShareHandler) HandleSubmit(ctx *gostratum.WorkerContext, event M.JsonRpcEvent) error {
+	if sh.poolapi.IsKaspa() {
+		return sh.TempKaspHandleSubmit(ctx, event)
+	}
+
+	if sh.poolapi.IsAleo() {
+		jsonevent, _ := json.MarshalIndent(event, "", "  ")
+		fmt.Printf("[TODO] HandleSubmit Aleo %s", jsonevent)
+	}
+	return nil
+}
+
+func (sh *ShareHandler) TempKaspHandleSubmit(ctx *gostratum.WorkerContext, event M.JsonRpcEvent) error {
 	submitInfo, err := validateSubmit(ctx, event)
 	if err != nil {
 		return err
@@ -182,6 +194,8 @@ func (sh *ShareHandler) HandleSubmit(ctx *gostratum.WorkerContext, event M.JsonR
 		}
 	}
 	stats := sh.getCreateStats(ctx)
+
+	// TODO 校验event是否过期
 	// if err := sh.checkStales(ctx, submitInfo); err != nil {
 	// 	if err == ErrDupeShare {
 	// 		ctx.Logger.Info("dupe share "+submitInfo.noncestr, ctx.DeviceName, ctx.WalletAddr)
@@ -258,6 +272,20 @@ func (sh *ShareHandler) HandleSubmit(ctx *gostratum.WorkerContext, event M.JsonR
 }
 
 func (sh *ShareHandler) submit(ctx *gostratum.WorkerContext,
+	block *externalapi.DomainBlock, nonce uint64, eventId any) error {
+	if sh.poolapi.IsKaspa() {
+		sh.temp_kasp_submit(ctx, block, nonce, eventId)
+	}
+
+	if sh.poolapi.IsAleo() {
+		fmt.Printf("[TODO] submit Aleo")
+	}
+	// nil return allows HandleSubmit to record share (blocks are shares too!) and
+	// handle the response to the client
+	return nil
+}
+
+func (sh *ShareHandler) temp_kasp_submit(ctx *gostratum.WorkerContext,
 	block *externalapi.DomainBlock, nonce uint64, eventId any) error {
 	mutable := block.Header.ToMutable()
 	mutable.SetNonce(nonce)

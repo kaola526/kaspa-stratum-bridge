@@ -32,7 +32,7 @@ type clientListener struct {
 
 func newClientListener(poolApi *PoolApi, logger *zap.SugaredLogger, shareHandler *ShareHandler, minShareDiff float64, extranonceSize int8) *clientListener {
 	return &clientListener{
-		logger:         logger,
+		logger:         logger.Named("[clientListener]"),
 		minShareDiff:   minShareDiff,
 		extranonceSize: extranonceSize,
 		maxExtranonce:  int32(math.Pow(2, (8*math.Min(float64(extranonceSize), 3))) - 1),

@@ -51,10 +51,7 @@ func NewListener(cfg StratumListenerConfig) *StratumListener {
 		disconnectChannel:     make(DisconnectChannel),
 	}
 
-	listener.Logger = listener.Logger.With(
-		zap.String("component", "stratum"),
-		zap.String("address", listener.Port),
-	)
+	listener.Logger = listener.Logger.Named("[StratumListener]")
 
 	if listener.StateGenerator == nil {
 		listener.Logger.Warn("no state generator provided, using default")
@@ -97,7 +94,7 @@ func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 	clientContext := &WorkerContext{
 		parentContext: ctx,
 		remoteAddr:    addr,
-		Logger:        s.Logger.With(zap.String("client", addr)),
+		Logger:        s.Logger.Named("[WorkerContext]"),
 		connection:    connection,
 		state:         s.StateGenerator(),
 		onDisconnect:  s.disconnectChannel,

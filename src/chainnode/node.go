@@ -1,6 +1,7 @@
 package chainnode
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -9,9 +10,10 @@ import (
 	"github.com/kaspanet/kaspad/app/appmessage"
 	"github.com/kaspanet/kaspad/domain/consensus/model/externalapi"
 	"github.com/kaspanet/kaspad/infrastructure/network/rpcclient"
-	"github.com/onemorebsmith/poolstratum/src/chainnode/aleo/aleostratum"
+	"github.com/onemorebsmith/poolstratum/src/chainnode/aleo"
 	I "github.com/onemorebsmith/poolstratum/src/comment"
 	M "github.com/onemorebsmith/poolstratum/src/comment/model"
+
 	// "github.com/onemorebsmith/poolstratum/src/gostratum"
 	psm "github.com/onemorebsmith/poolstratum/src/prom"
 	"github.com/pkg/errors"
@@ -60,12 +62,12 @@ type ChainNode struct {
 	chainType string
 	Logger    *zap.SugaredLogger
 	kasaip    *rpcclient.RPCClient
-	aleoaip   *aleostratum.AleoStratumClient
+	aleoNode  *aleo.AleoNode
 }
 
 func CreateChainNode(chainType string, address string, logger *zap.SugaredLogger) (*ChainNode, error) {
 	var kasaip *rpcclient.RPCClient
-	var aleoaip *aleostratum.AleoStratumClient
+	var aleoNode *aleo.AleoNode
 	var err error
 	if chainType == ChainTypeKaspa {
 		kasaip, err = rpcclient.NewRPCClient(address)
@@ -75,19 +77,42 @@ func CreateChainNode(chainType string, address string, logger *zap.SugaredLogger
 	}
 
 	if chainType == ChainTypeAleo {
-		aleoaip = aleostratum.CreateStratumClient(address, ChannelId, MinerName, DeviceName)
+		aleoNode, _ = aleo.NewAleoNode(address, time.Duration(time.Minute), logger);
+		// aleoaip = aleostratum.CreateStratumClient(address, ChannelId, MinerName, DeviceName)
 	}
 
 	return &ChainNode{
 		chainType: chainType,
 		Logger:    logger.With(zap.String("client", chainType)),
 		kasaip:    kasaip,
-		aleoaip:   aleoaip,
+		aleoNode:   aleoNode,
 	}, nil
+}
+
+func (chainnode *ChainNode) ChainType() string {
+	return chainnode.chainType
+}
+
+func (chainnode *ChainNode) IsKaspa() bool {
+	return chainnode.chainType == ChainTypeKaspa
+}
+
+func (chainnode *ChainNode) IsAleo() bool {
+	return chainnode.chainType == ChainTypeAleo
 }
 
 func (chainnode *ChainNode) checkType(chainType string) bool {
 	return chainnode.chainType == chainType
+}
+
+func (chainnode *ChainNode) Start(ctx context.Context, blockCb func()) {
+	if chainnode.IsAleo() {
+		chainnode.aleoNode.Start(ctx, blockCb)
+	}
+
+	if chainnode.IsKaspa() {
+		chainnode.Logger.Info("[TODO] Kaspa Start")
+	}
 }
 
 func (chainnode *ChainNode) Close() error {
@@ -149,21 +174,21 @@ func (chainnode *ChainNode) SubmitBlock(block *externalapi.DomainBlock) (appmess
 
 func (chainnode *ChainNode) Subscribe() error {
 	if chainnode.checkType(ChainTypeAleo) {
-		return chainnode.aleoaip.Subscribe()
+		return chainnode.aleoNode.Subscribe()
 	}
 	return fmt.Errorf(chainnode.chainType, " not Subscribe")
 }
 
 func (chainnode *ChainNode) Authorize() error {
 	if chainnode.checkType(ChainTypeAleo) {
-		return chainnode.aleoaip.Authorize()
+		return chainnode.aleoNode.Authorize()
 	}
 	return fmt.Errorf(chainnode.chainType, " not Authorize")
 }
 
 func (chainnode *ChainNode) Listen(cb func(line string) error) error {
 	if chainnode.checkType(ChainTypeAleo) {
-		return chainnode.aleoaip.Listen(cb)
+		return chainnode.aleoNode.Listen(cb)
 	}
 	return fmt.Errorf(chainnode.chainType, " not Listen")
 }
@@ -171,7 +196,7 @@ func (chainnode *ChainNode) Listen(cb func(line string) error) error {
 // 保存chain发送的work数据
 func (chainnode *ChainNode) SaveWork(work *M.JsonRpcEvent) error {
 	if chainnode.checkType(ChainTypeAleo) {
-		chainnode.aleoaip.LastWork = work
+		chainnode.aleoNode.SetLastWork(work)
 		return nil
 	}
 	return fmt.Errorf(chainnode.chainType, " not Listen")
@@ -239,14 +264,14 @@ func (chainnode *ChainNode) GetNotifyParams(diff float64, client I.WorkerClientI
 
 		return jobId, jobParams, nil
 	} else if chainnode.checkType(ChainTypeAleo) {
-		if chainnode.aleoaip.LastWork == nil {
+		if chainnode.aleoNode.GetLastWork() == nil {
 			return 0, nil, fmt.Errorf(chainnode.chainType, " LastWork is nil")
 		}
-		if len(chainnode.aleoaip.LastWork.Params) != 6 {
+		if len(chainnode.aleoNode.GetLastWork().Params) != 6 {
 			return 0, nil, fmt.Errorf(chainnode.chainType, " LastWork LastWork.Params len != 6")
 		}
 		jobId = 0
-		jobParams = chainnode.aleoaip.LastWork.Params
+		jobParams = chainnode.aleoNode.GetLastWork().Params
 
 		return jobId, jobParams, nil
 	}

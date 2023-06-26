@@ -33,7 +33,7 @@ func NewPoolAPI(chain_type string, address string, blockWaitTime time.Duration, 
 		chainType:     chain_type,
 		address:       address,
 		blockWaitTime: blockWaitTime,
-		logger:        logger.With(zap.String("component", chain_type+":"+address)),
+		logger:        logger.Named("[PoolApi]"),
 		ChainNode:     chainnode,
 		connected:     true,
 	}, nil
@@ -41,32 +41,33 @@ func NewPoolAPI(chain_type string, address string, blockWaitTime time.Duration, 
 
 func (api *PoolApi) Start(ctx context.Context, blockCb func()) {
 	api.logger.Info(api.chainType, " Start\n")
-	if api.chainType == chainnode.ChainTypeKaspa {
+	if api.ChainNode.IsKaspa() {
 		api.waitForSync(true)
 		go api.startBlockTemplateListener(ctx, blockCb)
 		go api.startStatsThread(ctx)
-	} else if api.chainType == chainnode.ChainTypeAleo {
-		go func(ctx context.Context, blockCb func()) {
-			for {
-				fmt.Print("AleoNode Subscribe\n")
-				err := api.ChainNode.Subscribe()
-				if err != nil {
-					api.logger.Error("subscribe err ", err)
-					time.Sleep(time.Second * 5)
-					continue
-				}
-				fmt.Print("AleoNode Authorize\n")
-				err = api.ChainNode.Authorize()
-				if err != nil {
-					api.logger.Error("authorize err ", err)
-					time.Sleep(time.Second * 5)
-					continue
-				}
+	} else if api.ChainNode.IsAleo() {
+		api.ChainNode.Start(ctx, blockCb);
+		// go func(ctx context.Context, blockCb func()) {
+		// 	for {
+		// 		api.logger.Info("AleoNode Subscribe111\n")
+		// 		err := api.ChainNode.Subscribe()
+		// 		if err != nil {
+		// 			api.logger.Error("subscribe err ", err)
+		// 			time.Sleep(time.Second * 5)
+		// 			continue
+		// 		}
+		// 		api.logger.Info("AleoNode Authorize111\n")
+		// 		err = api.ChainNode.Authorize()
+		// 		if err != nil {
+		// 			api.logger.Error("authorize err ", err)
+		// 			time.Sleep(time.Second * 5)
+		// 			continue
+		// 		}
 
-				api.startBlockTemplateListener(ctx, blockCb)
-				time.Sleep(time.Second * 5)
-			}
-		}(ctx, blockCb)
+		// 		api.startBlockTemplateListener(ctx, blockCb)
+		// 		time.Sleep(time.Second * 5)
+		// 	}
+		// }(ctx, blockCb)
 	}
 }
 
@@ -159,7 +160,7 @@ func (api *PoolApi) startBlockTemplateListener(ctx context.Context, blockReadyCb
 		}
 	} else if api.chainType == chainnode.ChainTypeAleo {
 		api.ChainNode.Listen(func(line string) error {
-			fmt.Println("aleoclient Listen", line)
+			api.logger.Info("aleoclient Listen", line)
 			event, err := M.UnmarshalEvent(line)
 			if err != nil {
 				api.logger.Error("error unmarshalling event", zap.String("raw", line))
