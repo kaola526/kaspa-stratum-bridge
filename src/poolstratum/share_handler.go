@@ -37,7 +37,7 @@ type WorkStats struct {
 	LastShare     time.Time
 }
 
-type shareHandler struct {
+type ShareHandler struct {
 	poolapi      *chainnode.ChainNode
 	stats        map[string]*WorkStats
 	statsLock    sync.Mutex
@@ -45,15 +45,15 @@ type shareHandler struct {
 	tipBlueScore uint64
 }
 
-func newShareHandler(poolapi *chainnode.ChainNode) *shareHandler {
-	return &shareHandler{
+func NewShareHandler(poolapi *chainnode.ChainNode) *ShareHandler {
+	return &ShareHandler{
 		poolapi:   poolapi,
 		stats:     map[string]*WorkStats{},
 		statsLock: sync.Mutex{},
 	}
 }
 
-func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats {
+func (sh *ShareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats {
 	sh.statsLock.Lock()
 	var stats *WorkStats
 	found := false
@@ -136,7 +136,7 @@ var (
 // anything greater than this is considered a stale
 const workWindow = 8
 
-func (sh *shareHandler) checkStales(ctx *gostratum.StratumContext, si *submitInfo) error {
+func (sh *ShareHandler) checkStales(ctx *gostratum.StratumContext, si *submitInfo) error {
 	tip := sh.tipBlueScore
 	if si.block.Header.BlueScore > tip {
 		sh.tipBlueScore = si.block.Header.BlueScore
@@ -150,7 +150,7 @@ func (sh *shareHandler) checkStales(ctx *gostratum.StratumContext, si *submitInf
 	return nil
 }
 
-func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event M.JsonRpcEvent) error {
+func (sh *ShareHandler) HandleSubmit(ctx *gostratum.StratumContext, event M.JsonRpcEvent) error {
 	submitInfo, err := validateSubmit(ctx, event)
 	if err != nil {
 		return err
@@ -257,7 +257,7 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event M.Json
 	})
 }
 
-func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
+func (sh *ShareHandler) submit(ctx *gostratum.StratumContext,
 	block *externalapi.DomainBlock, nonce uint64, eventId any) error {
 	mutable := block.Header.ToMutable()
 	mutable.SetNonce(nonce)
@@ -300,7 +300,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 	return nil
 }
 
-func (sh *shareHandler) startStatsThread() error {
+func (sh *ShareHandler) startStatsThread() error {
 	start := time.Now()
 	for {
 		// console formatting is terrible. Good luck whever touches anything

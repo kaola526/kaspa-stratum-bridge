@@ -96,7 +96,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 		return err
 	}
 
-	shareHandler := newShareHandler(poolApi.ChainNode)
+	shareHandler := NewShareHandler(poolApi.ChainNode)
 	clientHandler := newClientListener(poolApi, logger, shareHandler, float64(minDiff), int8(extranonceSize))
 
 	// override the submit handler with an actual useful handler
