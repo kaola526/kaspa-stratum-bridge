@@ -97,7 +97,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 	}
 
 	shareHandler := NewShareHandler(poolApi.ChainNode)
-	clientHandler := newClientListener(poolApi, logger, shareHandler, float64(minDiff), int8(extranonceSize))
+	clientHandler := newWorkersAuthenticListener(poolApi, logger, shareHandler, float64(minDiff), int8(extranonceSize))
 
 	// override the submit handler with an actual useful handler
 	handlers[string(M.StratumMethodSubmit)] =
@@ -107,7 +107,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 			}
 			return nil
 		}
-	
+
 	// poolApi.ProxyHandlers(handlers)
 
 	stratumConfig := gostratum.StratumListenerConfig{

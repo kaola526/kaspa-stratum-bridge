@@ -16,7 +16,7 @@ import (
 
 const balanceDelay = time.Minute
 
-type clientListener struct {
+type workersAuthenticListener struct {
 	logger           *zap.SugaredLogger
 	shareHandler     *ShareHandler
 	clientLock       sync.RWMutex
@@ -30,8 +30,8 @@ type clientListener struct {
 	poolApi          *PoolApi
 }
 
-func newClientListener(poolApi *PoolApi, logger *zap.SugaredLogger, shareHandler *ShareHandler, minShareDiff float64, extranonceSize int8) *clientListener {
-	return &clientListener{
+func newWorkersAuthenticListener(poolApi *PoolApi, logger *zap.SugaredLogger, shareHandler *ShareHandler, minShareDiff float64, extranonceSize int8) *workersAuthenticListener {
+	return &workersAuthenticListener{
 		logger:         logger.Named("[clientListener]"),
 		minShareDiff:   minShareDiff,
 		extranonceSize: extranonceSize,
@@ -44,7 +44,7 @@ func newClientListener(poolApi *PoolApi, logger *zap.SugaredLogger, shareHandler
 	}
 }
 
-func (c *clientListener) OnConnect(ctx *gostratum.WorkerContext) {
+func (c *workersAuthenticListener) OnConnect(ctx *gostratum.WorkerContext) {
 	var extranonce int32
 	// TODO，断开重连会+1，会不会存在问题
 	// TODO，是否拒绝一些无效的连接
@@ -75,7 +75,7 @@ func (c *clientListener) OnConnect(ctx *gostratum.WorkerContext) {
 	}()
 }
 
-func (c *clientListener) OnDisconnect(ctx *gostratum.WorkerContext) {
+func (c *workersAuthenticListener) OnDisconnect(ctx *gostratum.WorkerContext) {
 	ctx.Done()
 	c.clientLock.Lock()
 	c.logger.Info("removing client ", ctx.Id)
@@ -85,7 +85,7 @@ func (c *clientListener) OnDisconnect(ctx *gostratum.WorkerContext) {
 	prom.RecordDisconnect(ctx)
 }
 
-func (c *clientListener) NewBlockAvailable() {
+func (c *workersAuthenticListener) NewBlockAvailable() {
 	if c.poolApi == nil {
 		return
 	}
