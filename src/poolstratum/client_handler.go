@@ -18,7 +18,7 @@ const balanceDelay = time.Minute
 
 type clientListener struct {
 	logger           *zap.SugaredLogger
-	shareHandler     *shareHandler
+	shareHandler     *ShareHandler
 	clientLock       sync.RWMutex
 	clients          map[int32]*gostratum.StratumContext
 	lastBalanceCheck time.Time
@@ -30,7 +30,7 @@ type clientListener struct {
 	poolApi          *PoolApi
 }
 
-func newClientListener(poolApi *PoolApi, logger *zap.SugaredLogger, shareHandler *shareHandler, minShareDiff float64, extranonceSize int8) *clientListener {
+func newClientListener(poolApi *PoolApi, logger *zap.SugaredLogger, shareHandler *ShareHandler, minShareDiff float64, extranonceSize int8) *clientListener {
 	return &clientListener{
 		logger:         logger,
 		minShareDiff:   minShareDiff,
