@@ -20,7 +20,7 @@ type clientListener struct {
 	logger           *zap.SugaredLogger
 	shareHandler     *ShareHandler
 	clientLock       sync.RWMutex
-	clients          map[int32]*gostratum.StratumContext
+	clients          map[int32]*gostratum.WorkerContext
 	lastBalanceCheck time.Time
 	clientCounter    int32
 	minShareDiff     float64
@@ -39,12 +39,12 @@ func newClientListener(poolApi *PoolApi, logger *zap.SugaredLogger, shareHandler
 		nextExtranonce: 0,
 		clientLock:     sync.RWMutex{},
 		shareHandler:   shareHandler,
-		clients:        make(map[int32]*gostratum.StratumContext),
+		clients:        make(map[int32]*gostratum.WorkerContext),
 		poolApi:        poolApi,
 	}
 }
 
-func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
+func (c *clientListener) OnConnect(ctx *gostratum.WorkerContext) {
 	var extranonce int32
 	// TODO，断开重连会+1，会不会存在问题
 	// TODO，是否拒绝一些无效的连接
@@ -75,7 +75,7 @@ func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
 	}()
 }
 
-func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
+func (c *clientListener) OnDisconnect(ctx *gostratum.WorkerContext) {
 	ctx.Done()
 	c.clientLock.Lock()
 	c.logger.Info("removing client ", ctx.Id)
@@ -100,7 +100,7 @@ func (c *clientListener) NewBlockAvailable() {
 		if !cl.Connected() {
 			continue
 		}
-		go func(client *gostratum.StratumContext) {
+		go func(client *gostratum.WorkerContext) {
 			jobId, jobParams, err := poolApi.ChainNode.GetNotifyParams(c.minShareDiff, client)
 			if err != nil {
 				return

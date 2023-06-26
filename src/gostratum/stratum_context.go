@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type StratumContext struct {
+type WorkerContext struct {
 	parentContext    context.Context
 	AppName          string
 	AppVersion       string
@@ -30,7 +30,7 @@ type StratumContext struct {
 	Logger           *zap.Logger
 	connection       net.Conn
 	disconnecting    bool
-	onDisconnect     chan *StratumContext
+	onDisconnect     chan *WorkerContext
 	state            any // gross, but go generics aren't mature enough this can be typed 😭
 	writeLock        int32
 	Extranonce       string
@@ -45,11 +45,11 @@ type ContextSummary struct {
 
 var ErrorDisconnected = fmt.Errorf("disconnecting")
 
-func (sc *StratumContext) Connected() bool {
+func (sc *WorkerContext) Connected() bool {
 	return !sc.disconnecting
 }
 
-func (sc *StratumContext) Summary() ContextSummary {
+func (sc *WorkerContext) Summary() ContextSummary {
 	return ContextSummary{
 		RemoteAddr: sc.remoteAddr,
 		WalletAddr: sc.walletAddr,
@@ -58,9 +58,9 @@ func (sc *StratumContext) Summary() ContextSummary {
 	}
 }
 
-func NewMockContext(ctx context.Context, logger *zap.Logger, state any) (*StratumContext, *MockConnection) {
+func NewMockContext(ctx context.Context, logger *zap.Logger, state any) (*WorkerContext, *MockConnection) {
 	mc := NewMockConnection()
-	return &StratumContext{
+	return &WorkerContext{
 		parentContext: ctx,
 		state:         state,
 		remoteAddr:    "127.0.0.1",
@@ -72,12 +72,12 @@ func NewMockContext(ctx context.Context, logger *zap.Logger, state any) (*Stratu
 	}, mc
 }
 
-func (sc *StratumContext) String() string {
+func (sc *WorkerContext) String() string {
 	serialized, _ := json.Marshal(sc)
 	return string(serialized)
 }
 
-func (sc *StratumContext) Reply(response M.JsonRpcResponse) error {
+func (sc *WorkerContext) Reply(response M.JsonRpcResponse) error {
 	if sc.disconnecting {
 		return ErrorDisconnected
 	}
@@ -89,7 +89,7 @@ func (sc *StratumContext) Reply(response M.JsonRpcResponse) error {
 	return sc.writeWithBackoff(encoded)
 }
 
-func (sc *StratumContext) Send(event M.JsonRpcEvent) error {
+func (sc *WorkerContext) Send(event M.JsonRpcEvent) error {
 	if sc.disconnecting {
 		return ErrorDisconnected
 	}
@@ -103,7 +103,7 @@ func (sc *StratumContext) Send(event M.JsonRpcEvent) error {
 
 var errWriteBlocked = fmt.Errorf("error writing to socket, previous write pending")
 
-func (sc *StratumContext) write(data []byte) error {
+func (sc *WorkerContext) write(data []byte) error {
 	if atomic.CompareAndSwapInt32(&sc.writeLock, 0, 1) {
 		defer atomic.StoreInt32(&sc.writeLock, 0)
 		deadline := time.Now().Add(5 * time.Second)
@@ -117,7 +117,7 @@ func (sc *StratumContext) write(data []byte) error {
 	return errWriteBlocked
 }
 
-func (sc *StratumContext) writeWithBackoff(data []byte) error {
+func (sc *WorkerContext) writeWithBackoff(data []byte) error {
 	for i := 0; i < 3; i++ {
 		err := sc.write(data)
 		if err == nil {
@@ -136,14 +136,14 @@ func (sc *StratumContext) writeWithBackoff(data []byte) error {
 	return fmt.Errorf("failed writing to socket after 3 attempts")
 }
 
-func (sc *StratumContext) ReplyStaleShare(id any) error {
+func (sc *WorkerContext) ReplyStaleShare(id any) error {
 	return sc.Reply(M.JsonRpcResponse{
 		Id:     id,
 		Result: nil,
 		Error:  []any{21, "Job not found", nil},
 	})
 }
-func (sc *StratumContext) ReplyDupeShare(id any) error {
+func (sc *WorkerContext) ReplyDupeShare(id any) error {
 	return sc.Reply(M.JsonRpcResponse{
 		Id:     id,
 		Result: nil,
@@ -151,7 +151,7 @@ func (sc *StratumContext) ReplyDupeShare(id any) error {
 	})
 }
 
-func (sc *StratumContext) ReplyBadShare(id any) error {
+func (sc *WorkerContext) ReplyBadShare(id any) error {
 	return sc.Reply(M.JsonRpcResponse{
 		Id:     id,
 		Result: nil,
@@ -159,7 +159,7 @@ func (sc *StratumContext) ReplyBadShare(id any) error {
 	})
 }
 
-func (sc *StratumContext) ReplyLowDiffShare(id any) error {
+func (sc *WorkerContext) ReplyLowDiffShare(id any) error {
 	return sc.Reply(M.JsonRpcResponse{
 		Id:     id,
 		Result: nil,
@@ -167,7 +167,7 @@ func (sc *StratumContext) ReplyLowDiffShare(id any) error {
 	})
 }
 
-func (sc *StratumContext) Disconnect() {
+func (sc *WorkerContext) Disconnect() {
 	if !sc.disconnecting {
 		mqData := mq.MQShareRecordData{
 			MessageId:     uuid.New().String(),
@@ -196,7 +196,7 @@ func (sc *StratumContext) Disconnect() {
 	}
 }
 
-func (sc *StratumContext) checkDisconnect(err error) {
+func (sc *WorkerContext) checkDisconnect(err error) {
 	if err != nil { // actual error
 		go sc.Disconnect() // potentially blocking, so async it
 	}
@@ -204,38 +204,38 @@ func (sc *StratumContext) checkDisconnect(err error) {
 
 // Context interface impl
 
-func (StratumContext) Deadline() (time.Time, bool) {
+func (WorkerContext) Deadline() (time.Time, bool) {
 	return time.Time{}, false
 }
 
-func (StratumContext) Done() <-chan struct{} {
+func (WorkerContext) Done() <-chan struct{} {
 	return nil
 }
 
-func (StratumContext) Err() error {
+func (WorkerContext) Err() error {
 	return nil
 }
 
-func (d StratumContext) Value(key any) any {
+func (d WorkerContext) Value(key any) any {
 	return d.parentContext.Value(key)
 }
 
-func (d StratumContext) MinerName() string {
+func (d WorkerContext) MinerName() string {
 	return d.minerName
 }
 
-func (d StratumContext) DeviceName() string {
+func (d WorkerContext) DeviceName() string {
 	return d.deviceName
 }
 
-func (d StratumContext) WalletAddr() string {
+func (d WorkerContext) WalletAddr() string {
 	return d.walletAddr
 }
 
-func (d StratumContext) RemoteAddr() string {
+func (d WorkerContext) RemoteAddr() string {
 	return d.remoteAddr
 }
 
-func (d StratumContext) State() any {
+func (d WorkerContext) State() any {
 	return d.state
 }

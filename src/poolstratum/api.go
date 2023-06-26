@@ -173,7 +173,7 @@ func (api *PoolApi) startBlockTemplateListener(ctx context.Context, blockReadyCb
 }
 
 func (api *PoolApi) GetBlockTemplate(
-	client *gostratum.StratumContext) (*appmessage.GetBlockTemplateResponseMessage, error) {
+	client *gostratum.WorkerContext) (*appmessage.GetBlockTemplateResponseMessage, error) {
 	template, err := api.ChainNode.GetBlockTemplate(client.WalletAddr(),
 		fmt.Sprintf(`'%s' via onemorebsmith/kaspa-stratum-bridge_%s`, client.MinerName, version))
 	if err != nil {

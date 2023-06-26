@@ -12,13 +12,13 @@ import (
 	"go.uber.org/zap"
 )
 
-type DisconnectChannel chan *StratumContext
+type DisconnectChannel chan *WorkerContext
 type StateGenerator func() any
-type EventHandler func(ctx *StratumContext, event M.JsonRpcEvent) error
+type EventHandler func(ctx *WorkerContext, event M.JsonRpcEvent) error
 
 type StratumClientListener interface {
-	OnConnect(ctx *StratumContext)
-	OnDisconnect(ctx *StratumContext)
+	OnConnect(ctx *WorkerContext)
+	OnDisconnect(ctx *WorkerContext)
 	NewBlockAvailable()
 }
 
@@ -94,7 +94,7 @@ func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 	if len(parts) > 0 {
 		addr = parts[0] // trim off the port
 	}
-	clientContext := &StratumContext{
+	clientContext := &WorkerContext{
 		parentContext: ctx,
 		remoteAddr:    addr,
 		Logger:        s.Logger.With(zap.String("client", addr)),
@@ -113,7 +113,7 @@ func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 
 }
 
-func (s *StratumListener) HandleEvent(ctx *StratumContext, event M.JsonRpcEvent) error {
+func (s *StratumListener) HandleEvent(ctx *WorkerContext, event M.JsonRpcEvent) error {
 	if handler, exists := s.HandlerMap[string(event.Method)]; exists {
 		err := handler(ctx, event)
 		if err == nil {
@@ -122,7 +122,7 @@ func (s *StratumListener) HandleEvent(ctx *StratumContext, event M.JsonRpcEvent)
 		return err
 	}
 	//s.Logger.Warn(fmt.Sprintf("unhandled event '%+v'", event))
-	
+
 	return nil
 }
 

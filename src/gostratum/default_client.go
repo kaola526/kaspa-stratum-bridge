@@ -7,14 +7,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mattn/go-colorable"
-	"github.com/onemorebsmith/poolstratum/src/mq"
-	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	util "github.com/onemorebsmith/poolstratum/src/chainnode"
+	M "github.com/onemorebsmith/poolstratum/src/comment/model"
+	"github.com/onemorebsmith/poolstratum/src/mq"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
-
 
 func DefaultLogger() *zap.Logger {
 	cfg := zap.NewDevelopmentEncoderConfig()
@@ -43,7 +42,7 @@ func DefaultHandlers() StratumHandlerMap {
 	}
 }
 
-func HandleAuthorize(ctx *StratumContext, event M.JsonRpcEvent) error {
+func HandleAuthorize(ctx *WorkerContext, event M.JsonRpcEvent) error {
 	if len(event.Params) < 2 {
 		return fmt.Errorf("malformed event from miner, expected param[1] to be address")
 	}
@@ -96,11 +95,11 @@ func HandleAuthorize(ctx *StratumContext, event M.JsonRpcEvent) error {
 	mq.Insertmqqt(ctx, string(jsonData), "Kaspa_Direct_Exchange", "Kaspa_Direct_Routing")
 
 	ctx.Logger.Info(fmt.Sprintf("client authorized, address: %s", ctx.WalletAddr))
-	
+
 	return nil
 }
 
-func HandleSubscribe(ctx *StratumContext, event M.JsonRpcEvent) error {
+func HandleSubscribe(ctx *WorkerContext, event M.JsonRpcEvent) error {
 	if err := ctx.Reply(M.NewResponse(event,
 		[]any{true, "kaspa/1.0.0"}, nil)); err != nil {
 		return errors.Wrap(err, "failed to send response to subscribe")
@@ -133,13 +132,13 @@ func HandleSubscribe(ctx *StratumContext, event M.JsonRpcEvent) error {
 	return nil
 }
 
-func HandleSubmit(ctx *StratumContext, event M.JsonRpcEvent) error {
+func HandleSubmit(ctx *WorkerContext, event M.JsonRpcEvent) error {
 	// stub
 	ctx.Logger.Info("work submission")
 	return nil
 }
 
-func SendExtranonce(ctx *StratumContext) {
+func SendExtranonce(ctx *WorkerContext) {
 	if err := ctx.Send(M.NewEvent("", "set_extranonce", []any{ctx.Extranonce, len(ctx.Extranonce)})); err != nil {
 		// should we doing anything further on failure
 		ctx.Logger.Error(errors.Wrap(err, "failed to set extranonce").Error(), zap.Any("context", ctx))

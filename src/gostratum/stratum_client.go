@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func spawnClientListener(ctx *StratumContext, connection net.Conn, s *StratumListener) error {
+func spawnClientListener(ctx *WorkerContext, connection net.Conn, s *StratumListener) error {
 	defer ctx.Disconnect()
 
 	for {

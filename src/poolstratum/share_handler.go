@@ -53,7 +53,7 @@ func NewShareHandler(poolapi *chainnode.ChainNode) *ShareHandler {
 	}
 }
 
-func (sh *ShareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats {
+func (sh *ShareHandler) getCreateStats(ctx *gostratum.WorkerContext) *WorkStats {
 	sh.statsLock.Lock()
 	var stats *WorkStats
 	found := false
@@ -94,7 +94,7 @@ type submitInfo struct {
 	NonceVal uint64
 }
 
-func validateSubmit(ctx *gostratum.StratumContext, event M.JsonRpcEvent) (*submitInfo, error) {
+func validateSubmit(ctx *gostratum.WorkerContext, event M.JsonRpcEvent) (*submitInfo, error) {
 	if len(event.Params) < 3 {
 		prom.RecordWorkerError(ctx.WalletAddr(), prom.ErrBadDataFromMiner)
 		return nil, fmt.Errorf("malformed event, expected at least 2 params")
@@ -136,7 +136,7 @@ var (
 // anything greater than this is considered a stale
 const workWindow = 8
 
-func (sh *ShareHandler) checkStales(ctx *gostratum.StratumContext, si *submitInfo) error {
+func (sh *ShareHandler) checkStales(ctx *gostratum.WorkerContext, si *submitInfo) error {
 	tip := sh.tipBlueScore
 	if si.block.Header.BlueScore > tip {
 		sh.tipBlueScore = si.block.Header.BlueScore
@@ -150,7 +150,7 @@ func (sh *ShareHandler) checkStales(ctx *gostratum.StratumContext, si *submitInf
 	return nil
 }
 
-func (sh *ShareHandler) HandleSubmit(ctx *gostratum.StratumContext, event M.JsonRpcEvent) error {
+func (sh *ShareHandler) HandleSubmit(ctx *gostratum.WorkerContext, event M.JsonRpcEvent) error {
 	submitInfo, err := validateSubmit(ctx, event)
 	if err != nil {
 		return err
@@ -257,7 +257,7 @@ func (sh *ShareHandler) HandleSubmit(ctx *gostratum.StratumContext, event M.Json
 	})
 }
 
-func (sh *ShareHandler) submit(ctx *gostratum.StratumContext,
+func (sh *ShareHandler) submit(ctx *gostratum.WorkerContext,
 	block *externalapi.DomainBlock, nonce uint64, eventId any) error {
 	mutable := block.Header.ToMutable()
 	mutable.SetNonce(nonce)
