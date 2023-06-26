@@ -111,7 +111,7 @@ func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 }
 
 func (s *StratumListener) HandleEvent(ctx *WorkerContext, event M.JsonRpcEvent) error {
-	s.Logger.Info(fmt.Sprintf("HandleEvent - %v", event));
+	s.Logger.Info(fmt.Sprintf("HandleEvent -> %v", event));
 	if handler, exists := s.HandlerMap[string(event.Method)]; exists {
 		err := handler(ctx, event)
 		if err == nil {
@@ -119,7 +119,6 @@ func (s *StratumListener) HandleEvent(ctx *WorkerContext, event M.JsonRpcEvent) 
 		}
 		return err
 	}
-	//s.Logger.Warn(fmt.Sprintf("unhandled event '%+v'", event))
 
 	return nil
 }
