@@ -107,6 +107,8 @@ func ListenAndServe(cfg BridgeConfig) error {
 			}
 			return nil
 		}
+	
+	// poolApi.ProxyHandlers(handlers)
 
 	stratumConfig := gostratum.StratumListenerConfig{
 		Port:           cfg.StratumPort,

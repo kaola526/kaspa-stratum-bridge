@@ -128,7 +128,7 @@ func HandleSubscribe(ctx *WorkerContext, event M.JsonRpcEvent) error {
 			ctx.DeviceType = deviceType
 		}
 	}
-	ctx.Logger.Info("client subscribed ", zap.Any("context", ctx))
+	fmt.Println("HandleSubscribe client subscribed")
 	return nil
 }
 
