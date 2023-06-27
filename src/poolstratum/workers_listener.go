@@ -92,6 +92,7 @@ func (c *workersAuthenticListener) NewBlockAvailable() {
 	poolApi := c.poolApi
 	c.clientLock.Lock()
 	addresses := make([]string, 0, len(c.clients))
+	c.logger.Infof("NewBlockAvailable clients(%d)", len(c.clients))
 	for _, cl := range c.clients {
 		if cl.AppName != poolApi.chainType {
 			c.logger.Info("client type ", cl.AppName, " != chain type "+poolApi.chainType)
@@ -155,71 +156,11 @@ func (c *workersAuthenticListener) ProxyHandlers(handlerMap gostratum.StratumHan
 }
 
 func (c *workersAuthenticListener) HandleSubscribe(workerCtx *gostratum.WorkerContext, event M.JsonRpcEvent) error {
-	c.logger.Info(fmt.Sprintf("HandleSubscribe event %v", event));
-	if c.poolApi.ChainNode.IsAleo() {
-		if err := workerCtx.Reply(M.NewResponse(event,
-			[]any{workerCtx.Extranonce}, nil)); err != nil {
-			return errors.Wrap(err, "failed to send response to subscribe")
-		}
-		if len(event.Params) > 0 {
-			app, ok := event.Params[0].(string)
-			if ok {
-				workerCtx.AppName = app
-			}
-		}
-		if len(event.Params) > 1 {
-			version, ok := event.Params[1].(string)
-			if ok {
-				workerCtx.AppVersion = version
-			}
-		}
-		if len(event.Params) > 2 {
-			deviceCompany, ok := event.Params[2].(string)
-			if ok {
-				workerCtx.DeviceCompany = deviceCompany
-			}
-		}
-		if len(event.Params) > 3 {
-			deviceType, ok := event.Params[3].(string)
-			if ok {
-				workerCtx.DeviceType = deviceType
-			}
-		}
-	}
-	if c.poolApi.ChainNode.IsKaspa() {
-		if err := workerCtx.Reply(M.NewResponse(event,
-			[]any{true, "kaspa/1.0.0"}, nil)); err != nil {
-			return errors.Wrap(err, "failed to send response to subscribe")
-		}
-		if len(event.Params) > 0 {
-			app, ok := event.Params[0].(string)
-			if ok {
-				workerCtx.AppName = app
-			}
-		}
-		if len(event.Params) > 1 {
-			version, ok := event.Params[1].(string)
-			if ok {
-				workerCtx.AppVersion = version
-			}
-		}
-		if len(event.Params) > 2 {
-			deviceCompany, ok := event.Params[2].(string)
-			if ok {
-				workerCtx.DeviceCompany = deviceCompany
-			}
-		}
-		if len(event.Params) > 3 {
-			deviceType, ok := event.Params[3].(string)
-			if ok {
-				workerCtx.DeviceType = deviceType
-			}
-		}
-	}
-	return nil
+	c.logger.Info(fmt.Sprintf("HandleSubscribe -> event %v", event));
+	return workerCtx.HandleSubscribe(event);
 }
 
 func (c *workersAuthenticListener) HandleAuthorize(workerCtx *gostratum.WorkerContext, event M.JsonRpcEvent) error {
-	c.logger.Info(fmt.Sprintf("HandleAuthorize event %v", event));
+	c.logger.Info(fmt.Sprintf("HandleAuthorize -> event %v", event));
 	return workerCtx.HandleAuthorize(event)
 }

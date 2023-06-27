@@ -83,7 +83,7 @@ func CreateChainNode(chainType string, address string, logger *zap.SugaredLogger
 
 	return &ChainNode{
 		chainType: chainType,
-		Logger:    logger.With(zap.String("client", chainType)),
+		Logger:    logger.Named("[ChainNode]"),
 		kasaip:    kasaip,
 		aleoNode:   aleoNode,
 	}, nil
@@ -106,16 +106,18 @@ func (chainnode *ChainNode) checkType(chainType string) bool {
 }
 
 func (chainnode *ChainNode) Start(ctx context.Context, blockCb func()) {
+	chainnode.Logger.Debug("Start")
 	if chainnode.IsAleo() {
 		chainnode.aleoNode.Start(ctx, blockCb)
 	}
 
 	if chainnode.IsKaspa() {
-		chainnode.Logger.Info("[TODO] Kaspa Start")
+		chainnode.Logger.Error("[TODO] Kaspa Start")
 	}
 }
 
 func (chainnode *ChainNode) Close() error {
+	chainnode.Logger.Debug("Close")
 	if chainnode.checkType(ChainTypeKaspa) {
 		return chainnode.kasaip.Close()
 	}
@@ -123,6 +125,7 @@ func (chainnode *ChainNode) Close() error {
 }
 
 func (chainnode *ChainNode) Reconnect() error {
+	chainnode.Logger.Debug("Reconnect")
 	if chainnode.checkType(ChainTypeKaspa) {
 		return chainnode.kasaip.Close()
 	}
@@ -130,12 +133,14 @@ func (chainnode *ChainNode) Reconnect() error {
 }
 
 func (chainnode *ChainNode) GetBlockDAGInfo() (*appmessage.GetBlockDAGInfoResponseMessage, error) {
+	chainnode.Logger.Debug("GetBlockDAGInfo")
 	if chainnode.checkType(ChainTypeKaspa) {
 		return chainnode.kasaip.GetBlockDAGInfo()
 	}
 	return nil, fmt.Errorf(chainnode.chainType, "  not GetBlockDAGInfo")
 }
 func (chainnode *ChainNode) EstimateNetworkHashesPerSecond(startHash string, windowSize uint32) (*appmessage.EstimateNetworkHashesPerSecondResponseMessage, error) {
+	chainnode.Logger.Debug("EstimateNetworkHashesPerSecond")
 	if chainnode.checkType(ChainTypeKaspa) {
 		return chainnode.kasaip.EstimateNetworkHashesPerSecond(startHash, windowSize)
 	}
@@ -203,6 +208,7 @@ func (chainnode *ChainNode) SaveWork(work *M.JsonRpcEvent) error {
 }
 
 func (chainnode *ChainNode) GetNotifyParams(diff float64, client I.WorkerClientInterface) (int, []any, error) {
+	chainnode.Logger.Infof("GetNotifyParams diff %f", diff)
 	var jobId int
 	var jobParams []any
 	if chainnode.checkType(ChainTypeKaspa) {
@@ -264,6 +270,7 @@ func (chainnode *ChainNode) GetNotifyParams(diff float64, client I.WorkerClientI
 
 		return jobId, jobParams, nil
 	} else if chainnode.checkType(ChainTypeAleo) {
+		
 		if chainnode.aleoNode.GetLastWork() == nil {
 			return 0, nil, fmt.Errorf(chainnode.chainType, " LastWork is nil")
 		}

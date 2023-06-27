@@ -187,7 +187,7 @@ var promInit sync.Once
 func StartPromServer(log *zap.SugaredLogger, port string) {
 	go func() { // prom http handler, separate from the main router
 		promInit.Do(func() {
-			logger := log.With(zap.String("server", "prometheus"))
+			logger := log.With(zap.String("server", "prometheus")).Named("[PromServer]")
 			http.Handle("/metrics", promhttp.Handler())
 			logger.Info("hosting prom stats on ", port, "/metrics")
 			if err := http.ListenAndServe(port, nil); err != nil {

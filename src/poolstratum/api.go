@@ -40,34 +40,13 @@ func NewPoolAPI(chain_type string, address string, blockWaitTime time.Duration, 
 }
 
 func (api *PoolApi) Start(ctx context.Context, blockCb func()) {
-	api.logger.Info(api.chainType, " Start\n")
+	api.logger.Info("Start for ", api.chainType)
 	if api.ChainNode.IsKaspa() {
 		api.waitForSync(true)
 		go api.startBlockTemplateListener(ctx, blockCb)
 		go api.startStatsThread(ctx)
 	} else if api.ChainNode.IsAleo() {
 		api.ChainNode.Start(ctx, blockCb);
-		// go func(ctx context.Context, blockCb func()) {
-		// 	for {
-		// 		api.logger.Info("AleoNode Subscribe111\n")
-		// 		err := api.ChainNode.Subscribe()
-		// 		if err != nil {
-		// 			api.logger.Error("subscribe err ", err)
-		// 			time.Sleep(time.Second * 5)
-		// 			continue
-		// 		}
-		// 		api.logger.Info("AleoNode Authorize111\n")
-		// 		err = api.ChainNode.Authorize()
-		// 		if err != nil {
-		// 			api.logger.Error("authorize err ", err)
-		// 			time.Sleep(time.Second * 5)
-		// 			continue
-		// 		}
-
-		// 		api.startBlockTemplateListener(ctx, blockCb)
-		// 		time.Sleep(time.Second * 5)
-		// 	}
-		// }(ctx, blockCb)
 	}
 }
 

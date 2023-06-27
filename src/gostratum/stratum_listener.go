@@ -29,6 +29,7 @@ type StratumStats struct {
 }
 
 type StratumListenerConfig struct {
+	ChainType      string
 	Logger         *zap.Logger
 	HandlerMap     StratumHandlerMap
 	ClientListener StratumClientListener
@@ -92,6 +93,7 @@ func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 		addr = parts[0] // trim off the port
 	}
 	clientContext := &WorkerContext{
+		chainType:     s.ChainType,
 		parentContext: ctx,
 		remoteAddr:    addr,
 		Logger:        s.Logger.Named("[WorkerContext]"),
@@ -111,10 +113,10 @@ func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 }
 
 func (s *StratumListener) HandleEvent(ctx *WorkerContext, event M.JsonRpcEvent) error {
-	s.Logger.Info(fmt.Sprintf("HandleEvent -> %v", event));
+	s.Logger.Info(fmt.Sprintf("HandleEvent -> %v", event))
 	if handler, exists := s.HandlerMap[string(event.Method)]; exists {
 		err := handler(ctx, event)
-		if err == nil {
+		if err == nil && (event.Method == M.StratumMethodAuthorize) {
 			s.ClientListener.NewBlockAvailable()
 		}
 		return err

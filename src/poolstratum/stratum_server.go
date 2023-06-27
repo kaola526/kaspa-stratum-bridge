@@ -102,6 +102,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 	handlers = workersListener.ProxyHandlers(handlers)
 
 	stratumConfig := gostratum.StratumListenerConfig{
+		ChainType:      cfg.ChainType,
 		Port:           cfg.StratumPort,
 		HandlerMap:     handlers,
 		StateGenerator: prom.MiningStateGenerator,

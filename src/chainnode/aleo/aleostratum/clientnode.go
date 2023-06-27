@@ -13,6 +13,7 @@ import (
 
 	M "github.com/onemorebsmith/poolstratum/src/comment/model"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 const (
@@ -56,12 +57,13 @@ type PoolConfig struct {
 }
 
 // Stratum 协议客户端
-type AleoStratumClient struct {
+type AleoStratumNode struct {
 	Config    PoolConfig
 	conn      net.Conn
 	connected bool
 	writeLock int32
 	LastWork  *M.JsonRpcEvent
+	logger    *zap.SugaredLogger
 }
 
 func NewResponse(event M.JsonRpcEvent, results any, err []any) M.JsonRpcResponse {
@@ -72,31 +74,27 @@ func NewResponse(event M.JsonRpcEvent, results any, err []any) M.JsonRpcResponse
 	}
 }
 
-func CreateStratumClient(address string, channelid string, minername string, devicename string) *AleoStratumClient {
-	return &AleoStratumClient{
+func CreateStratumNode(address string, channelid string, minername string, devicename string, logger *zap.SugaredLogger) *AleoStratumNode {
+	return &AleoStratumNode{
 		Config: PoolConfig{address, channelid, minername, devicename},
+		logger: logger.Named("[AleoStratumNode]"),
 	}
 }
 
 // 注册
-func (sc *AleoStratumClient) Subscribe() error {
+func (aleoNodeStratum *AleoStratumNode) Subscribe() error {
+	aleoNodeStratum.logger.Info("Subscribe")
 	var err error
-	fmt.Printf("step1 000\n")
-	sc.conn, err = net.Dial("tcp", sc.Config.address)
+	aleoNodeStratum.conn, err = net.Dial("tcp", aleoNodeStratum.Config.address)
 	if err != nil {
 		return err
 	}
 
-	sc.connected = true
-	fmt.Printf("step1 111\n")
+	aleoNodeStratum.connected = true
 	// 渠道名，软件与版本
-	jobParams := []interface{}{sc.Config.channelid, "aleopool/0.0.1", nil}
-	// err = sc.writeMessage(Version, StratumMethodSubscribe, params)
-	// if err != nil {
-	// 	return err
-	// }
+	jobParams := []interface{}{aleoNodeStratum.Config.channelid, "aleopool/0.0.1", nil}
 
-	if err := sc.Send(M.JsonRpcEvent{
+	if err := aleoNodeStratum.Send(M.JsonRpcEvent{
 		Version: "2.0",
 		Method:  StratumMethodSubscribe,
 		Id:      0,
@@ -106,55 +104,56 @@ func (sc *AleoStratumClient) Subscribe() error {
 		return err
 	}
 
-	fmt.Printf("step1 222\n")
 	// 接收响应信息，包括协议版本号、唯一标识符和响应状态
-	err = sc.readResponse(func(line string) error {
+	err = aleoNodeStratum.readResponse(func(line string) error {
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("step1. subscribe ok.\n")
+	aleoNodeStratum.logger.Info("Subscribe OK")
 
 	return nil
 }
 
-func (sc *AleoStratumClient) Authorize() error {
+func (aleoNodeStratum *AleoStratumNode) Authorize() error {
+	aleoNodeStratum.logger.Info("Authorize")
 	var err error
 
 	// 发送挖矿请求，包括工作区块头信息和唯一标识符等信息
-	jobParams := []interface{}{sc.Config.minername, sc.Config.devicename, nil}
+	jobParams := []interface{}{aleoNodeStratum.Config.minername, aleoNodeStratum.Config.devicename, nil}
 
-	if err := sc.Send(M.JsonRpcEvent{
+	if err := aleoNodeStratum.Send(M.JsonRpcEvent{
 		Version: "2.0",
 		Method:  StratumMethodAuthorize,
 		Id:      0,
 		Params:  jobParams,
 	}); err != nil {
-		fmt.Printf("step2 {err}\n")
+		aleoNodeStratum.logger.Errorf("Authorize {err}")
 		return err
 	}
 
 	// 接收响应信息，包括工作描述符和目标难度等信息
-	err = sc.readResponse(func(line string) error {
-		fmt.Println("step2 Authorize readResponse ", line)
+	err = aleoNodeStratum.readResponse(func(line string) error {
+		aleoNodeStratum.logger.Infof("Authorize response data:%s", line)
 		return nil
 	})
 	if err != nil {
 		return err
 	}
-	fmt.Printf("step2 authorize ok.\n")
+	aleoNodeStratum.logger.Info("Authorize OK")
 
 	return nil
 }
 
-func (sc *AleoStratumClient) Listen(cb LineCallback) error {
+func (aleoNodeStratum *AleoStratumNode) Listen(cb LineCallback) error {
+	aleoNodeStratum.logger.Info("Listen ing")
 	for {
 		buffer := make([]byte, 4096)
-		_, err := sc.conn.Read(buffer)
+		_, err := aleoNodeStratum.conn.Read(buffer)
 		if err != nil && err != io.EOF {
-			fmt.Print("read err ", err, "\n")
+			aleoNodeStratum.logger.Error("read err ", err)
 			return errors.Wrapf(err, "error reading from connection")
 		}
 		buffer = bytes.ReplaceAll(buffer, []byte("\x00"), nil)
@@ -171,7 +170,7 @@ func (sc *AleoStratumClient) Listen(cb LineCallback) error {
 type LineCallback func(line string) error
 
 // 读取 JSON-RPC 响应消息
-func (sc *AleoStratumClient) readResponse(cb LineCallback) error {
+func (sc *AleoStratumNode) readResponse(cb LineCallback) error {
 	// deadline := time.Now().Add(5 * time.Second).UTC()
 	// if err := sc.conn.SetReadDeadline(deadline); err != nil {
 	// 	return err
@@ -193,7 +192,7 @@ func (sc *AleoStratumClient) readResponse(cb LineCallback) error {
 	return nil
 }
 
-func (sc *AleoStratumClient) Reply(response M.JsonRpcResponse) error {
+func (sc *AleoStratumNode) Reply(response M.JsonRpcResponse) error {
 	if !sc.connected {
 		return ErrorDisconnected
 	}
@@ -205,7 +204,7 @@ func (sc *AleoStratumClient) Reply(response M.JsonRpcResponse) error {
 	return sc.writeWithBackoff(encoded)
 }
 
-func (sc *AleoStratumClient) Send(event M.JsonRpcEvent) error {
+func (sc *AleoStratumNode) Send(event M.JsonRpcEvent) error {
 	if !sc.connected {
 		return ErrorDisconnected
 	}
@@ -219,7 +218,7 @@ func (sc *AleoStratumClient) Send(event M.JsonRpcEvent) error {
 
 var errWriteBlocked = fmt.Errorf("error writing to socket, previous write pending")
 
-func (sc *AleoStratumClient) writeWithBackoff(data []byte) error {
+func (sc *AleoStratumNode) writeWithBackoff(data []byte) error {
 	for i := 0; i < 3; i++ {
 		err := sc.write(data)
 		if err == nil {
@@ -238,7 +237,7 @@ func (sc *AleoStratumClient) writeWithBackoff(data []byte) error {
 	return fmt.Errorf("failed writing to socket after 3 attempts")
 }
 
-func (sc *AleoStratumClient) write(data []byte) error {
+func (sc *AleoStratumNode) write(data []byte) error {
 	if atomic.CompareAndSwapInt32(&sc.writeLock, 0, 1) {
 		defer atomic.StoreInt32(&sc.writeLock, 0)
 		deadline := time.Now().Add(5 * time.Second)
@@ -252,13 +251,13 @@ func (sc *AleoStratumClient) write(data []byte) error {
 	return errWriteBlocked
 }
 
-func (sc *AleoStratumClient) checkDisconnect(err error) {
+func (sc *AleoStratumNode) checkDisconnect(err error) {
 	if err != nil { // actual error
 		go sc.Disconnect() // potentially blocking, so async it
 	}
 }
 
-func (sc *AleoStratumClient) Disconnect() {
+func (sc *AleoStratumNode) Disconnect() {
 	if sc.connected {
 		// TODO 处理断开逻辑
 	}

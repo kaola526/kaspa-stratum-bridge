@@ -56,6 +56,7 @@ func HandleSubmit(ctx *WorkerContext, event M.JsonRpcEvent) error {
 }
 
 func SendExtranonce(ctx *WorkerContext) {
+	
 	if err := ctx.Send(M.NewEvent("", "set_extranonce", []any{ctx.Extranonce, len(ctx.Extranonce)})); err != nil {
 		// should we doing anything further on failure
 		ctx.Logger.Error(errors.Wrap(err, "failed to set extranonce").Error(), zap.Any("context", ctx))

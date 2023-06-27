@@ -43,7 +43,7 @@ extranonce_size: 3
 
 # print_stats: if true will print stats to the console, false just workers
 # joining/disconnecting, blocks found, and errors will be printed
-print_stats: true
+print_stats: false
 
 # log_to_file: if true logs will be written to a file local to the executable
 log_to_file: true

@@ -2,7 +2,6 @@ package aleo
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/onemorebsmith/poolstratum/src/chainnode/aleo/aleostratum"
@@ -26,49 +25,57 @@ type AleoNode struct {
 	/// 连接状态
 	connected bool
 	///
-	aleoclient *aleostratum.AleoStratumClient
+	aleoclient *aleostratum.AleoStratumNode
 }
 
 func NewAleoNode(address string, blockWaitTime time.Duration, logger *zap.SugaredLogger) (*AleoNode, error) {
-	client := aleostratum.CreateStratumClient(address, ChannelId, MinerName, DeviceName)
+	client := aleostratum.CreateStratumNode(address, ChannelId, MinerName, DeviceName, logger)
 
 	return &AleoNode{
 		address:       address,
 		blockWaitTime: blockWaitTime,
-		logger:        logger.Named("[NewAleoNode]"),
+		logger:        logger.Named("[AleoNode]"),
 		aleoclient:    client,
 		connected:     true,
 	}, nil
 }
 
-func (ks *AleoNode) Start(ctx context.Context, blockCb func()) {
-	ks.logger.Info("AleoNode Start")
+func (aleoNode *AleoNode) Start(ctx context.Context, blockCb func()) {
+	aleoNode.logger.Info("Start")
 	go func(ctx context.Context, blockCb func()) {
 		for {
-			ks.logger.Info("AleoNode Subscribe")
-			err := ks.aleoclient.Subscribe()
+			aleoNode.logger.Info("Start->Subscribe")
+			err := aleoNode.aleoclient.Subscribe()
 			if err != nil {
-				ks.logger.Error("subscribe err ", err)
+				aleoNode.logger.Error("subscribe err ", err)
 				time.Sleep(time.Second * 5)
 				continue
 			}
-			ks.logger.Info("AleoNode Authorize\n")
-			err = ks.aleoclient.Authorize()
+			aleoNode.logger.Info("Start->Authorize")
+			err = aleoNode.aleoclient.Authorize()
 			if err != nil {
-				ks.logger.Error("authorize err ", err)
+				aleoNode.logger.Error("authorize err ", err)
 				time.Sleep(time.Second * 5)
 				continue
 			}
 
-			ks.startBlockTemplateListener(ctx, blockCb)
+			aleoNode.logger.Info("Start->startBlockTemplateListener")
+			aleoNode.startBlockTemplateListener(ctx, blockCb)
 			time.Sleep(time.Second * 5)
 		}
 	}(ctx, blockCb)
 }
 
-func (ks *AleoNode) startBlockTemplateListener(ctx context.Context, blockCb func()) {
-	ks.aleoclient.Listen(func(line string) error {
-		fmt.Println("aleoclient Listen", line)
+func (aleoNode *AleoNode) startBlockTemplateListener(ctx context.Context, blockCb func()) {
+	aleoNode.logger.Info("startBlockTemplateListener")
+	aleoNode.aleoclient.Listen(func(line string) error {
+		aleoNode.logger.Info("Listen line ", line)
+		event, err := M.UnmarshalEvent(line)
+		if err != nil {
+			aleoNode.logger.Error("startBlockTemplateListener cb err ", err)
+		}
+		aleoNode.SetLastWork(&event)
+		blockCb()
 		return nil
 	})
 }
@@ -86,9 +93,9 @@ func (ks *AleoNode) Listen(cb aleostratum.LineCallback) error {
 }
 
 func (ks *AleoNode) SetLastWork(work *M.JsonRpcEvent) {
-	ks.aleoclient.LastWork = work;
+	ks.aleoclient.LastWork = work
 }
 
-func (ks *AleoNode) GetLastWork() *M.JsonRpcEvent{
-	return ks.aleoclient.LastWork;
+func (ks *AleoNode) GetLastWork() *M.JsonRpcEvent {
+	return ks.aleoclient.LastWork
 }
